@@ -1,0 +1,4298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <title>支出分担計算</title>
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic UI', 'Segoe UI', sans-serif;
+            background: linear-gradient(145deg, #080f1e 0%, #0f2040 40%, #112a5c 70%, #0d1f47 100%);
+            min-height: 100vh;
+            min-height: 100dvh;
+            padding: 16px;
+            padding-bottom: max(16px, env(safe-area-inset-bottom));
+            color: #e2e8f0;
+        }
+
+        .container { max-width: 1120px; margin: 0 auto; }
+
+        /* ── ヘッダー ── */
+        .header { text-align: center; padding: 24px 0 28px; }
+        .header h1 {
+            font-size: clamp(22px, 5vw, 32px);
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #60a5fa 0%, #818cf8 50%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 6px;
+        }
+        .header p { font-size: 13px; color: #7c8cad; margin-bottom: 14px; }
+
+        /* ── 月セレクタ (NEW) ── */
+        .month-selector {
+            display: inline-flex;
+            align-items: center;
+            gap: 14px;
+            background: rgba(30, 58, 100, 0.4);
+            border: 1px solid rgba(96, 165, 250, 0.35);
+            border-radius: 14px;
+            padding: 8px 18px;
+        }
+        .month-nav-btn {
+            background: rgba(96, 165, 250, 0.1);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            color: #60a5fa;
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s;
+            -webkit-tap-highlight-color: transparent;
+            line-height: 1;
+        }
+        .month-nav-btn:active { background: rgba(96, 165, 250, 0.28); }
+        .month-display {
+            font-size: 17px;
+            font-weight: 700;
+            color: #93c5fd;
+            min-width: 100px;
+            text-align: center;
+            letter-spacing: 0.2px;
+        }
+
+        /* ── アップロード ── */
+        .upload-section {
+            background: rgba(30, 58, 100, 0.35);
+            border: 2px dashed rgba(96, 165, 250, 0.5);
+            border-radius: 14px;
+            padding: 22px 20px;
+            margin-bottom: 18px;
+            text-align: center;
+            cursor: pointer;
+            transition: background 0.25s, border-color 0.25s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .upload-section:hover  { background: rgba(30, 58, 100, 0.55); border-color: #60a5fa; }
+        .upload-section.dragover { background: rgba(96, 165, 250, 0.12); border-color: #93c5fd; }
+        .upload-section input[type="file"] { display: none; }
+        .upload-label { display: block; cursor: pointer; }
+        .upload-icon { font-size: 28px; margin-bottom: 6px; }
+        .upload-text  { color: #60a5fa; font-weight: 700; font-size: 15px; margin-bottom: 3px; }
+        .upload-hint  { font-size: 12px; color: #64748b; }
+
+        /* ── ツールバー ── */
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.18s ease;
+            -webkit-tap-highlight-color: transparent;
+            min-height: 44px;
+            white-space: nowrap;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #fff;
+        }
+        .btn-primary:active { opacity: 0.85; transform: scale(0.97); }
+        .btn-secondary {
+            background: rgba(100, 116, 155, 0.15);
+            color: #a5b4fc;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+        }
+        .btn-secondary:active { opacity: 0.8; }
+
+        /* ── セクション ── */
+        .items-section {
+            background: rgba(20, 40, 80, 0.35);
+            border-radius: 14px;
+            padding: 18px;
+            margin-bottom: 20px;
+        }
+        .section-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #60a5fa;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        /* ── 項目カード ── */
+        .item-card {
+            background: rgba(10, 20, 45, 0.55);
+            border: 1px solid rgba(96, 165, 250, 0.18);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+            transition: border-color 0.2s;
+            position: relative;
+        }
+        .item-card.imported { border-left: 4px solid #3b82f6; }
+        .item-card.custom   { border-left: 4px solid #7c3aed; }
+
+        /* 新着ハイライト */
+        .item-card.new-item {
+            border-color: rgba(251, 191, 36, 0.6);
+            border-left-color: #fbbf24;
+            background: rgba(251, 191, 36, 0.06);
+            box-shadow: 0 0 16px rgba(251, 191, 36, 0.15);
+            animation: flashNew 0.5s ease;
+        }
+        @keyframes flashNew {
+            0%  { box-shadow: 0 0 0 rgba(251,191,36,0); background: rgba(251,191,36,0.18); }
+            60% { box-shadow: 0 0 24px rgba(251,191,36,0.4); }
+            100%{ box-shadow: 0 0 16px rgba(251,191,36,0.15); }
+        }
+        .new-badge {
+            display: inline-block;
+            background: #fbbf24;
+            color: #1a1000;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 1px 6px;
+            border-radius: 20px;
+            margin-left: 6px;
+            vertical-align: middle;
+            letter-spacing: 0.5px;
+        }
+
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .item-meta { flex: 1; min-width: 0; }
+        .item-name {
+            font-size: 14px;
+            font-weight: 700;
+            word-break: break-all;
+            line-height: 1.4;
+        }
+        .item-date { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+        /* 削除ボタン */
+        .btn-delete {
+            background: rgba(239, 68, 68, 0.12);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            min-height: 36px;
+            min-width: 44px;
+            flex-shrink: 0;
+            transition: background 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn-delete:active { background: rgba(239,68,68,0.25); }
+
+        /* 金額入力 */
+        .amount-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .amount-row label { font-size: 12px; color: #7c8cad; }
+        .amount-input {
+            background: rgba(148, 163, 184, 0.06);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            color: #e2e8f0;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            width: 120px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            -webkit-appearance: none;
+        }
+        .amount-input:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15);
+        }
+        .amount-unit { font-size: 13px; color: #94a3b8; }
+
+        /* カスタム名前入力 */
+        .name-input {
+            background: rgba(148, 163, 184, 0.06);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            color: #e2e8f0;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            width: 100%;
+            margin-bottom: 10px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .name-input:focus {
+            outline: none;
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+        }
+        .name-input::placeholder { color: #475569; font-weight: 400; }
+
+        /* ── カテゴリ選択 (NEW) ── */
+        .category-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .category-row label { font-size: 12px; color: #7c8cad; flex-shrink: 0; }
+        .category-select {
+            background: rgba(148, 163, 184, 0.06);
+            border: 1px solid rgba(96, 165, 250, 0.25);
+            color: #e2e8f0;
+            padding: 7px 28px 7px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            flex: 1;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%2394a3b8' d='M5 7L0.5 2h9z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            transition: border-color 0.2s;
+            min-height: 34px;
+        }
+        .category-select:focus { outline: none; border-color: #60a5fa; }
+        .category-select option { background: #0f2040; color: #e2e8f0; }
+
+        /* ── セグメント型タイプ選択 ── */
+        .type-selector {
+            display: flex;
+            gap: 0;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid rgba(96, 165, 250, 0.25);
+            margin-bottom: 12px;
+        }
+        .type-btn {
+            flex: 1;
+            padding: 9px 4px;
+            font-size: 12px;
+            font-weight: 700;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: rgba(10, 20, 50, 0.4);
+            color: #64748b;
+            transition: background 0.18s, color 0.18s;
+            -webkit-tap-highlight-color: transparent;
+            min-height: 44px;
+            line-height: 1.3;
+            letter-spacing: -0.2px;
+        }
+        .type-btn + .type-btn { border-left: 1px solid rgba(96, 165, 250, 0.2); }
+        .type-btn:active { opacity: 0.8; }
+
+        .type-btn.active-own {
+            background: linear-gradient(135deg, rgba(59,130,246,0.35), rgba(37,99,235,0.35));
+            color: #93c5fd;
+        }
+        .type-btn.active-full {
+            background: linear-gradient(135deg, rgba(16,185,129,0.35), rgba(5,150,105,0.35));
+            color: #6ee7b7;
+        }
+        .type-btn.active-partial {
+            background: linear-gradient(135deg, rgba(245,158,11,0.3), rgba(217,119,6,0.3));
+            color: #fcd34d;
+        }
+
+        /* 一部立替金額 */
+        .partial-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.25);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .partial-row label { font-size: 12px; color: #fcd34d; }
+
+        /* カードフッター */
+        .item-footer {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding-top: 10px;
+            border-top: 1px solid rgba(96, 165, 250, 0.08);
+        }
+        .burden-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #60a5fa;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59,130,246,0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+        .burden-chip-label { font-size: 11px; font-weight: 500; color: #7c8cad; }
+
+        /* ── 集計 ── */
+        .summary-section {
+            background: rgba(20, 40, 80, 0.35);
+            border-radius: 14px;
+            padding: 18px;
+            border: 1px solid rgba(96,165,250,0.12);
+        }
+        /* 上段：小さい3枚 */
+        .summary-grid-top {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        /* 下段：大きい2枚 */
+        .summary-grid-bottom {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .summary-card {
+            background: rgba(10, 20, 45, 0.5);
+            border: 1px solid rgba(96, 165, 250, 0.18);
+            border-radius: 12px;
+            padding: 14px 12px;
+            text-align: center;
+        }
+        .summary-card-label { font-size: 11px; color: #64748b; margin-bottom: 6px; letter-spacing: 0.2px; }
+        .summary-card-value {
+            font-size: clamp(16px, 3.5vw, 22px);
+            font-weight: 800;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        /* 他者負担分（大）— オレンジ系 */
+        .summary-card.own-card {
+            border: 2px solid rgba(251, 146, 60, 0.45);
+            background: rgba(245, 158, 11, 0.07);
+            padding: 18px 16px;
+        }
+        .summary-card.own-card .summary-card-label { color: #fcd34d; font-weight: 600; font-size: 12px; }
+        .summary-card.own-card .summary-card-value {
+            font-size: clamp(24px, 5.5vw, 34px);
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        /* 総支出額合計（大）— 青紫系 */
+        .summary-card.total-card {
+            border: 2px solid rgba(96, 165, 250, 0.45);
+            background: rgba(59, 130, 246, 0.07);
+            padding: 18px 16px;
+        }
+        .summary-card.total-card .summary-card-label { color: #93c5fd; font-weight: 600; font-size: 12px; }
+        .summary-card.total-card .summary-card-value {
+            font-size: clamp(24px, 5.5vw, 34px);
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* 空状態 */
+        .empty-state {
+            text-align: center;
+            padding: 48px 20px;
+            color: #475569;
+        }
+        .empty-icon { font-size: 44px; margin-bottom: 12px; }
+
+        /* 通知 */
+        .notification {
+            position: fixed;
+            top: max(16px, env(safe-area-inset-top));
+            right: 16px;
+            left: 16px;
+            max-width: 320px;
+            margin: 0 auto;
+            background: rgba(16, 185, 129, 0.92);
+            color: #fff;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            z-index: 9999;
+            backdrop-filter: blur(8px);
+            animation: slideDown 0.3s ease;
+            text-align: center;
+        }
+        .notification.error { background: rgba(239, 68, 68, 0.92); }
+        .notification.info  { background: rgba(96, 165, 250, 0.92); }
+        @keyframes slideDown {
+            from { transform: translateY(-60px); opacity: 0; }
+            to   { transform: translateY(0); opacity: 1; }
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 540px) {
+            body { padding: 12px; }
+            .controls { gap: 8px; }
+            .btn { flex: 1; min-width: 0; font-size: 13px; padding: 10px 10px; }
+            .summary-grid-top { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+            .summary-grid-top .summary-card { padding: 10px 8px; }
+            .summary-grid-top .summary-card-value { font-size: clamp(13px, 3.5vw, 18px); }
+            .type-btn { font-size: 11px; padding: 9px 2px; }
+            .amount-input { width: 100px; }
+        }
+
+        @media (hover: none) {
+            .amount-input, .name-input { font-size: 16px; }
+        }
+
+        /* ── 返金確認モーダル ── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            animation: overlayIn 0.2s ease;
+        }
+        @keyframes overlayIn {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+        .modal-box {
+            background: linear-gradient(160deg, #0f1e3a 0%, #152848 100%);
+            border: 1px solid rgba(251, 191, 36, 0.35);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 520px;
+            width: 100%;
+            max-height: 85dvh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(251,191,36,0.1);
+            animation: modalIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        /* 予算設定モーダルは青系ボーダー */
+        .modal-box.budget-modal-box {
+            border-color: rgba(96, 165, 250, 0.4);
+            box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(96,165,250,0.1);
+        }
+        @keyframes modalIn {
+            from { transform: translateY(20px) scale(0.96); opacity: 0; }
+            to   { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        .modal-icon { font-size: 32px; margin-bottom: 10px; text-align: center; }
+        .modal-title {
+            font-size: 17px; font-weight: 800; text-align: center;
+            color: #fbbf24; margin-bottom: 6px;
+        }
+        .modal-title.blue { color: #60a5fa; }
+        .modal-desc {
+            font-size: 13px; color: #94a3b8; text-align: center;
+            line-height: 1.6; margin-bottom: 16px;
+        }
+        .modal-pairs {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(251,191,36,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .modal-pair-header {
+            background: rgba(251,191,36,0.1);
+            padding: 8px 14px;
+            font-size: 11px; font-weight: 700;
+            color: #fbbf24; letter-spacing: 0.05em;
+        }
+        .modal-pair-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 10px 14px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .modal-pair-date { font-size: 11px; color: #64748b; min-width: 70px; }
+        .modal-pair-name { flex: 1; font-size: 13px; font-weight: 600; color: #e2e8f0; word-break: break-all; }
+        .modal-pair-pos  { font-size: 12px; color: #6ee7b7; font-weight: 700; white-space: nowrap; }
+        .modal-pair-arr  { color: #64748b; font-size: 12px; }
+        .modal-pair-neg  { font-size: 12px; color: #f87171; font-weight: 700; white-space: nowrap; }
+        .modal-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .modal-btn {
+            width: 100%; padding: 13px 16px;
+            border-radius: 10px; border: none;
+            font-size: 13px; font-weight: 700;
+            cursor: pointer; transition: all 0.18s ease;
+            display: flex; align-items: center; justify-content: center;
+            gap: 8px; text-align: left;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .modal-btn-main {
+            background: linear-gradient(135deg, #d97706, #b45309);
+            color: #fff;
+        }
+        .modal-btn-main.blue-btn {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+        }
+        .modal-btn-main:active { opacity: 0.85; }
+        .modal-btn-sub {
+            background: rgba(100, 116, 155, 0.15);
+            color: #a5b4fc;
+            border: 1px solid rgba(148,163,184,0.25);
+        }
+        .modal-btn-sub:active { opacity: 0.8; }
+        .modal-btn-cancel {
+            background: none;
+            color: #64748b;
+            font-size: 12px;
+            padding: 8px;
+        }
+        .modal-btn-cancel:active { color: #94a3b8; }
+        .modal-btn-desc {
+            font-size: 11px; font-weight: 400;
+            opacity: 0.8; margin-top: 2px;
+        }
+        .modal-btn-content { display: flex; flex-direction: column; }
+
+        /* ── プログレスバー ── */
+        .flow-bar { height: 12px; border-radius: 6px; overflow: hidden; display: flex; margin: 10px 0; }
+        .flow-bar-seg { height: 100%; transition: width 0.5s ease; }
+        .bar-own     { background: #3b82f6; }
+        .bar-full    { background: #10b981; }
+        .bar-partial { background: #f59e0b; }
+        .bar-others  { background: #334155; }
+
+        /* 凡例 */
+        .flow-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: #94a3b8; }
+        .legend-dot  { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+
+        /* 内訳式 */
+        .flow-equation { font-size: 12px; color: #64748b; text-align: center; padding: 8px 0; line-height: 1.8; }
+        .flow-eq-highlight { color: #93c5fd; font-weight: 700; }
+
+        /* 回収済みカード */
+        .item-card.collected-card { opacity: 0.6; }
+        .item-card.collected-card .item-name { text-decoration: line-through; color: #64748b; }
+        .collect-toggle {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 700;
+            cursor: pointer; border: 1px solid; transition: all 0.18s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .collect-toggle.uncollected { background: rgba(16,185,129,0.1); color: #6ee7b7; border-color: rgba(16,185,129,0.3); }
+        .collect-toggle.collected-done { background: rgba(16,185,129,0.25); color: #34d399; border-color: rgba(52,211,153,0.5); }
+
+        /* フィルタ・ソートバー */
+        .list-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+        .filter-tabs { display: flex; border-radius: 8px; overflow: hidden; border: 1px solid rgba(96,165,250,0.2); }
+        .filter-tab { padding: 6px 10px; font-size: 11px; font-weight: 700; cursor: pointer; border: none; background: rgba(10,20,50,0.4); color: #64748b; transition: all 0.15s; -webkit-tap-highlight-color: transparent; min-height: 36px; }
+        .filter-tab + .filter-tab { border-left: 1px solid rgba(96,165,250,0.15); }
+        .filter-tab.active { background: rgba(59,130,246,0.3); color: #93c5fd; }
+        .sort-select { background: rgba(10,20,50,0.4); border: 1px solid rgba(96,165,250,0.2); color: #94a3b8; padding: 6px 10px; border-radius: 8px; font-size: 11px; cursor: pointer; min-height: 36px; }
+        .sort-select:focus { outline: none; border-color: #60a5fa; }
+
+        /* フローカード */
+        .flow-card {
+            background: rgba(10, 20, 45, 0.5);
+            border: 1px solid rgba(96, 165, 250, 0.18);
+            border-radius: 12px;
+        }
+
+        /* ── カテゴリ別予算セクション (NEW) ── */
+        .cat-budget-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(96, 165, 250, 0.12);
+        }
+        .cat-budget-section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .cat-budget-section-title span {
+            font-size: 13px;
+            font-weight: 700;
+            color: #60a5fa;
+        }
+        .btn-budget-settings {
+            background: rgba(96, 165, 250, 0.1);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            color: #60a5fa;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            min-height: 30px;
+            transition: background 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn-budget-settings:active { background: rgba(96, 165, 250, 0.22); }
+
+        .cat-budget-row {
+            margin-bottom: 12px;
+        }
+        .cat-budget-row:last-child { margin-bottom: 0; }
+        .cat-budget-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .cat-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: #cbd5e1;
+        }
+        .cat-amount { font-size: 11px; color: #94a3b8; }
+        .cat-progress-bar {
+            height: 7px;
+            border-radius: 4px;
+            background: rgba(96, 165, 250, 0.1);
+            overflow: hidden;
+            margin-bottom: 3px;
+        }
+        .cat-progress-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.45s ease;
+        }
+        .cat-budget-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+        }
+        .cat-pct { font-weight: 700; }
+        .cat-remaining { font-size: 10px; }
+
+        /* 予算設定モーダル内の入力行 */
+        .budget-input-rows {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(96,165,250,0.15);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .budget-input-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 11px 14px;
+            border-bottom: 1px solid rgba(96,165,250,0.08);
+        }
+        .budget-input-row:last-child { border-bottom: none; }
+        .budget-input-row label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #cbd5e1;
+            min-width: 110px;
+        }
+        .budget-input-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .budget-amount-input {
+            background: rgba(148, 163, 184, 0.08);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            color: #e2e8f0;
+            padding: 7px 10px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            width: 110px;
+            text-align: right;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .budget-amount-input:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 2px rgba(96,165,250,0.15);
+        }
+        .budget-unit { font-size: 12px; color: #94a3b8; }
+
+        /* ── 予算モーダル内の収入ブロック ── */
+        .budget-income-block {
+            background: rgba(16, 185, 129, 0.06);
+            border: 1px solid rgba(52, 211, 153, 0.25);
+            border-radius: 10px;
+            padding: 12px 14px 10px;
+            margin-bottom: 0;
+        }
+        .budget-block-heading {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            margin-bottom: 2px;
+        }
+        .budget-section-divider {
+            border-top: 1px solid rgba(96, 165, 250, 0.12);
+            margin: 14px 0 10px;
+        }
+        .income-input:focus {
+            border-color: rgba(52, 211, 153, 0.7) !important;
+            box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.15) !important;
+        }
+
+        /* ── 貯金サマリーカード ── */
+        .savings-card {
+            background: rgba(10, 20, 45, 0.65);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+        }
+        .savings-income-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .savings-label-text {
+            font-size: 12px;
+            font-weight: 700;
+            color: #6ee7b7;
+        }
+        .savings-income-amt {
+            font-size: 20px;
+            font-weight: 800;
+            color: #34d399;
+            letter-spacing: -0.5px;
+        }
+        .savings-bar-track {
+            height: 10px;
+            background: rgba(96, 165, 250, 0.08);
+            border-radius: 5px;
+            overflow: visible;
+            margin-bottom: 4px;
+            position: relative;
+        }
+        .savings-bar-fill {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.45s ease;
+        }
+        /* 予算合計ラインマーカー */
+        .savings-budget-marker {
+            position: absolute;
+            top: -4px;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 5px solid transparent;
+            border-right: 5px solid transparent;
+            border-top: 7px solid #a78bfa;
+        }
+        .savings-bar-legend {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .savings-stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .savings-stat-box {
+            background: rgba(148, 163, 184, 0.05);
+            border: 1px solid rgba(96, 165, 250, 0.1);
+            border-radius: 8px;
+            padding: 8px 10px;
+        }
+        .savings-stat-box.highlight-green {
+            background: rgba(16, 185, 129, 0.06);
+            border-color: rgba(52, 211, 153, 0.2);
+        }
+        .savings-stat-box.highlight-blue {
+            background: rgba(59, 130, 246, 0.06);
+            border-color: rgba(96, 165, 250, 0.2);
+        }
+        .savings-stat-label {
+            font-size: 10px;
+            color: #64748b;
+            margin-bottom: 3px;
+        }
+        .savings-stat-val { font-size: 14px; font-weight: 700; }
+        .savings-stat-val.neutral { color: #a78bfa; }
+
+        /* カテゴリリストのセパレータ */
+        .cat-list-section {
+            padding-top: 4px;
+            border-top: 1px solid rgba(96, 165, 250, 0.1);
+            margin-top: 2px;
+        }
+
+        /* ── 決済カード選択（各項目カード内）── */
+        .card-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .card-row label { font-size: 12px; color: #7c8cad; flex-shrink: 0; }
+        .payment-card-select {
+            background: rgba(148, 163, 184, 0.06);
+            border: 1px solid rgba(167, 139, 250, 0.3);
+            color: #e2e8f0;
+            padding: 7px 28px 7px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            flex: 1;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%2394a3b8' d='M5 7L0.5 2h9z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            transition: border-color 0.2s;
+            min-height: 34px;
+        }
+        .payment-card-select:focus { outline: none; border-color: #a78bfa; }
+        .payment-card-select option { background: #0f2040; color: #e2e8f0; }
+
+        /* ── カード別内訳セクション（集計内）── */
+        .card-breakdown-section {
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(167, 139, 250, 0.15);
+        }
+        .card-breakdown-heading {
+            font-size: 13px;
+            font-weight: 700;
+            color: #a78bfa;
+            margin-bottom: 10px;
+        }
+        .card-breakdown-note {
+            font-size: 10px;
+            color: #475569;
+            text-align: center;
+            padding: 6px 0 2px;
+            line-height: 1.5;
+        }
+
+        /* ── カード管理モーダル内 ── */
+        .card-manage-list {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(167,139,250,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+        .card-manage-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(167,139,250,0.08);
+            gap: 10px;
+        }
+        .card-manage-row:last-child { border-bottom: none; }
+        .card-manage-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #e2e8f0;
+            flex: 1;
+        }
+        .card-manage-badge {
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: rgba(167,139,250,0.15);
+            color: #a78bfa;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+        .btn-card-remove {
+            background: rgba(239,68,68,0.1);
+            border: 1px solid rgba(239,68,68,0.25);
+            color: #f87171;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.15s;
+        }
+        .btn-card-remove:active { background: rgba(239,68,68,0.22); }
+        .card-add-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .card-name-input {
+            flex: 1;
+            background: rgba(148,163,184,0.06);
+            border: 1px solid rgba(167,139,250,0.3);
+            color: #e2e8f0;
+            padding: 9px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .card-name-input:focus { outline: none; border-color: #a78bfa; }
+        .card-name-input::placeholder { color: #475569; }
+        .btn-card-add {
+            background: linear-gradient(135deg, rgba(167,139,250,0.3), rgba(139,92,246,0.3));
+            border: 1px solid rgba(167,139,250,0.4);
+            color: #c4b5fd;
+            padding: 9px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn-card-add:active { opacity: 0.8; }
+
+        /* ── カテゴリ管理モーダル内 ── */
+        .cat-manage-list {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(52,211,153,0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+        .cat-manage-row {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(52,211,153,0.08);
+            gap: 8px;
+        }
+        .cat-manage-row:last-child { border-bottom: none; }
+        .cat-manage-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #e2e8f0;
+            flex: 1;
+        }
+        .cat-edit-input {
+            flex: 1;
+            background: rgba(148,163,184,0.08);
+            border: 1px solid rgba(52,211,153,0.4);
+            color: #e2e8f0;
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        .cat-edit-input:focus { outline: none; border-color: #34d399; }
+        .btn-cat-rename {
+            background: rgba(52,211,153,0.1);
+            border: 1px solid rgba(52,211,153,0.3);
+            color: #6ee7b7;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.15s;
+        }
+        .btn-cat-rename:active { background: rgba(52,211,153,0.22); }
+        .btn-cat-save {
+            background: rgba(52,211,153,0.2);
+            border: 1px solid rgba(52,211,153,0.4);
+            color: #34d399;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn-cat-save:active { opacity: 0.8; }
+        .btn-cat-cancel-edit {
+            background: rgba(100,116,155,0.1);
+            border: 1px solid rgba(148,163,184,0.2);
+            color: #94a3b8;
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 11px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .btn-cat-remove {
+            background: rgba(239,68,68,0.1);
+            border: 1px solid rgba(239,68,68,0.25);
+            color: #f87171;
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.15s;
+        }
+        .btn-cat-remove:active { background: rgba(239,68,68,0.22); }
+
+        /* ── 収支計算フォーミュラ ── */
+        .savings-formula {
+            background: rgba(0,0,0,0.22);
+            border: 1px solid rgba(96,165,250,0.12);
+            border-radius: 8px;
+            padding: 11px 13px;
+            margin: 10px 0 6px;
+        }
+        .sf-title { font-size: 11px; font-weight: 700; color: #60a5fa; letter-spacing: 0.05em; margin-bottom: 8px; }
+        .sf-row { display: flex; justify-content: space-between; align-items: center; padding: 2px 0; }
+        .sf-label { font-size: 11px; color: #94a3b8; flex: 1; }
+        .sf-val { font-size: 12px; font-weight: 700; white-space: nowrap; }
+        .sf-income-val { color: #34d399; }
+        .sf-minus-val { color: #94a3b8; }
+        .sf-othercard-val { color: #fb923c; font-weight: 700; }
+        .sf-warn-val { color: #fcd34d; font-weight: 700; }
+        .sf-divider { border-top: 1px solid rgba(96,165,250,0.15); margin: 6px 0; }
+        .sf-result-label { font-size: 12px; font-weight: 700; color: #e2e8f0; flex: 1; }
+        .sf-result-val { font-size: 16px; font-weight: 800; }
+        .sf-final-label { font-size: 10px; color: #64748b; }
+        .sf-note-row { padding: 2px 0; }
+        .sf-note { font-size: 10px; color: #475569; font-style: italic; }
+
+        /* 他カード引き落とし option 色 */
+        option.opt-other-card { color: #fb923c; }
+
+        /* ── 支払元口座 select ── */
+        .payment-source-select {
+            background: rgba(148, 163, 184, 0.06);
+            border: 1px solid rgba(52, 211, 153, 0.3);
+            color: #e2e8f0;
+            padding: 7px 28px 7px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 500;
+            flex: 1;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%2394a3b8' d='M5 7L0.5 2h9z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            min-height: 34px;
+            transition: border-color 0.2s;
+        }
+        .payment-source-select:focus { outline: none; border-color: #34d399; }
+        .payment-source-select option { background: #0f2040; color: #e2e8f0; }
+
+        /* ── 2カラムメインレイアウト（PC: 左=集計sticky、右=リスト） ── */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 370px 1fr;
+            gap: 20px;
+            align-items: start;
+            margin-bottom: 20px;
+        }
+
+        /* 左カラム: sticky固定 + 独立スクロール領域 */
+        .summary-col {
+            position: sticky;
+            top: 16px;
+            max-height: calc(100dvh - 48px);
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(96,165,250,0.3) transparent;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+        .summary-col::-webkit-scrollbar { width: 4px; }
+        .summary-col::-webkit-scrollbar-track { background: transparent; }
+        .summary-col::-webkit-scrollbar-thumb {
+            background: rgba(96,165,250,0.3);
+            border-radius: 2px;
+        }
+
+        /* 右カラム */
+        .items-col { min-width: 0; }
+
+        /* 折りたたみ切り替え */
+        .summary-toggle-btn {
+            background: rgba(96,165,250,0.1);
+            border: 1px solid rgba(96,165,250,0.25);
+            color: #60a5fa;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.15s;
+            white-space: nowrap;
+        }
+        .summary-toggle-btn:active { background: rgba(96,165,250,0.22); }
+        .summary-collapsible { transition: max-height 0.3s ease, opacity 0.3s ease; overflow: hidden; }
+        .summary-section.collapsed .summary-collapsible { max-height: 0 !important; opacity: 0; overflow: hidden; }
+        .summary-mini-bar {
+            display: none;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 6px 0 4px;
+        }
+        .summary-section.collapsed .summary-mini-bar { display: flex; }
+        .smb-chip {
+            background: rgba(59,130,246,0.12);
+            border: 1px solid rgba(96,165,250,0.2);
+            border-radius: 20px;
+            padding: 3px 10px;
+            font-size: 11px;
+            color: #93c5fd;
+            font-weight: 700;
+        }
+        .smb-chip.green { background: rgba(16,185,129,0.12); border-color: rgba(52,211,153,0.2); color: #34d399; }
+
+        /* ── 口座残高パネル ── */
+        .balance-panel {
+            background: rgba(5,10,25,0.5);
+            border: 1px solid rgba(52,211,153,0.25);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-top: 12px;
+        }
+        .balance-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .balance-title { font-size: 12px; font-weight: 700; color: #34d399; }
+        .btn-income-entry {
+            background: linear-gradient(135deg, rgba(5,150,105,0.35), rgba(4,120,87,0.35));
+            border: 1px solid rgba(52,211,153,0.4);
+            color: #6ee7b7;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 7px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            transition: background 0.15s;
+        }
+        .btn-income-entry:active { opacity: 0.8; }
+        .balance-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(52,211,153,0.07);
+            font-size: 12px;
+        }
+        .balance-row:last-of-type { border-bottom: none; }
+        .balance-acc-name { color: #94a3b8; }
+        .balance-acc-val  { font-weight: 700; }
+        .balance-total-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid rgba(52,211,153,0.2);
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .balance-total-label { color: #6ee7b7; }
+        .balance-total-val   { font-size: 15px; }
+
+        /* ── 収入エントリ行 ── */
+        .income-entry-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 12px;
+            border-bottom: 1px solid rgba(52,211,153,0.07);
+            font-size: 11px;
+        }
+        .income-entry-row:last-child { border-bottom: none; }
+        .ie-date { color: #64748b; min-width: 70px; }
+        .ie-dest { color: #6ee7b7; min-width: 80px; }
+        .ie-amt  { color: #34d399; font-weight: 700; flex: 1; text-align: right; }
+        .ie-note { color: #475569; font-size: 10px; min-width: 40px; }
+        .ie-del-btn {
+            background: none; border: none; color: #475569; cursor: pointer;
+            font-size: 12px; padding: 2px 4px; -webkit-tap-highlight-color: transparent;
+        }
+        .ie-del-btn:hover { color: #f87171; }
+
+        /* ── スマホ: 縦積み（サマリー上・リスト下）── */
+        @media (max-width: 768px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+            .summary-col {
+                position: static;
+                max-height: none;
+                overflow: visible;
+            }
+        }
+
+        @media (max-width: 540px) {
+            .balance-panel { padding: 10px 12px; }
+        }
+
+        /* ── 特別支出スタイル ── */
+        .item-card.special-item {
+            opacity: 0.62;
+            border-left-color: #a78bfa !important;
+            background: rgba(124, 58, 237, 0.05);
+        }
+        .special-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 10px;
+            background: rgba(124,58,237,0.2);
+            color: #c4b5fd;
+            border: 1px solid rgba(167,139,250,0.35);
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-weight: 700;
+            margin-left: 6px;
+        }
+        .special-toggle-row {
+            display: flex;
+            align-items: center;
+            padding: 7px 0 3px;
+            border-top: 1px solid rgba(167,139,250,0.12);
+            margin-top: 2px;
+        }
+        .special-toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #94a3b8;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .special-toggle-label:hover { color: #c4b5fd; }
+        .special-toggle-label input[type="checkbox"] {
+            width: 15px; height: 15px;
+            accent-color: #a78bfa;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .item-card.special-item .special-toggle-label { color: #c4b5fd; }
+        /* 未分類警告行 */
+        .unclassified-row {
+            border: 1px dashed rgba(252,211,77,0.3);
+            border-radius: 8px;
+            padding: 8px 10px;
+            margin-top: 6px;
+            background: rgba(251,191,36,0.04);
+        }
+        /* 予算モーダル固定カテゴリ強調 */
+        .budget-input-row.fixed-cat label::after {
+            content: ' 固定';
+            font-size: 9px;
+            color: #60a5fa;
+            font-weight: 700;
+            margin-left: 4px;
+        }
+
+        /* ── 収入レコード管理モーダル ── */
+        .income-record-list {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(52,211,153,0.2);
+            border-radius: 10px; overflow: hidden;
+            margin-bottom: 14px; max-height: 260px; overflow-y: auto;
+            scrollbar-width: thin;
+        }
+        .income-record-row {
+            display: flex; align-items: center; gap: 7px;
+            padding: 8px 12px; border-bottom: 1px solid rgba(52,211,153,0.07);
+            font-size: 11px;
+        }
+        .income-record-row:last-child { border-bottom: none; }
+        .ir-month { color: #64748b; min-width: 56px; }
+        .ir-name  { flex: 1; color: #e2e8f0; font-weight: 600; word-break: break-all; min-width: 0; }
+        .ir-amt   { color: #34d399; font-weight: 700; white-space: nowrap; }
+        .ir-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
+        .ir-badge.pending  { background: rgba(251,191,36,0.15); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+        .ir-badge.received { background: rgba(52,211,153,0.15); color: #34d399; border: 1px solid rgba(52,211,153,0.3); }
+        .ir-toggle {
+            background: rgba(96,165,250,0.1); border: 1px solid rgba(96,165,250,0.28); color: #93c5fd;
+            border-radius: 6px; padding: 3px 8px; font-size: 10px; font-weight: 700;
+            cursor: pointer; white-space: nowrap; -webkit-tap-highlight-color: transparent;
+        }
+        .ir-toggle:active { opacity: 0.75; }
+        .ir-del { background: none; border: none; color: #475569; cursor: pointer; font-size: 12px; padding: 2px 4px; -webkit-tap-highlight-color: transparent; }
+        .ir-del:hover { color: #f87171; }
+
+        /* ── 資金移動モーダル ── */
+        .transfer-list {
+            background: rgba(0,0,0,0.2);
+            border: 1px solid rgba(167,139,250,0.2);
+            border-radius: 10px; overflow: hidden;
+            margin-bottom: 14px; max-height: 200px; overflow-y: auto;
+            scrollbar-width: thin;
+        }
+        .transfer-row {
+            display: flex; align-items: center; gap: 6px;
+            padding: 8px 12px; border-bottom: 1px solid rgba(167,139,250,0.07);
+            font-size: 11px;
+        }
+        .transfer-row:last-child { border-bottom: none; }
+        .tr-date { color: #64748b; min-width: 70px; }
+        .tr-from { color: #fb923c; }
+        .tr-arr  { color: #475569; }
+        .tr-to   { color: #6ee7b7; }
+        .tr-amt  { flex: 1; text-align: right; color: #c4b5fd; font-weight: 700; }
+        .tr-del  { background: none; border: none; color: #475569; cursor: pointer; font-size: 12px; padding: 2px 4px; -webkit-tap-highlight-color: transparent; }
+        .tr-del:hover { color: #f87171; }
+        .btn-transfer {
+            background: linear-gradient(135deg, rgba(139,92,246,0.3), rgba(109,40,217,0.3));
+            border: 1px solid rgba(167,139,250,0.4); color: #c4b5fd;
+            font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 7px;
+            cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 0.15s;
+        }
+        .btn-transfer:active { opacity: 0.8; }
+
+        /* ── クラウド同期インジケーター ── */
+        #syncIndicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        #syncIndicator.state-idle    { display: none; }
+        #syncIndicator.state-syncing { background: rgba(96,165,250,0.15); border: 1px solid rgba(96,165,250,0.35); color: #93c5fd; }
+        #syncIndicator.state-ok      { background: rgba(52,211,153,0.13); border: 1px solid rgba(52,211,153,0.3);  color: #34d399; }
+        #syncIndicator.state-error   { background: rgba(248,113,113,0.13); border: 1px solid rgba(248,113,113,0.3); color: #f87171; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .sync-spin { display: inline-block; animation: spin 1s linear infinite; }
+
+        /* ── クラウド同期設定モーダル ── */
+        .cloud-modal-box {
+            border-color: rgba(96,165,250,0.4) !important;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(96,165,250,0.1) !important;
+        }
+        .cloud-url-input {
+            width: 100%;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(96,165,250,0.3);
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: #e2e8f0;
+            font-size: 13px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            word-break: break-all;
+            resize: vertical;
+            min-height: 70px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+        .cloud-url-input:focus { border-color: rgba(96,165,250,0.7); }
+        .cloud-url-input::placeholder { color: #475569; font-family: inherit; }
+        .cloud-status-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            margin-bottom: 12px;
+        }
+        .cloud-status-row.ok    { background: rgba(52,211,153,0.1); color: #34d399; border: 1px solid rgba(52,211,153,0.2); }
+        .cloud-status-row.error { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+        .cloud-status-row.idle  { background: rgba(100,116,139,0.1); color: #64748b; border: 1px solid rgba(100,116,139,0.2); }
+        .btn-cloud-sync {
+            background: linear-gradient(135deg, rgba(59,130,246,0.3), rgba(37,99,235,0.3));
+            border: 1px solid rgba(96,165,250,0.4);
+            color: #93c5fd;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 7px;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+            min-height: 44px;
+        }
+        .btn-cloud-sync:active { opacity: 0.8; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="header">
+        <h1>💰 支出分担計算</h1>
+        <p>CSVを読み込んで項目ごとの負担額を管理</p>
+        <!-- 同期状態インジケーター -->
+        <div style="display:flex;justify-content:center;margin-bottom:6px;">
+            <span id="syncIndicator" class="state-idle"></span>
+        </div>
+        <!-- 対象月セレクタ -->
+        <div class="month-selector">
+            <button class="month-nav-btn" id="prevMonthBtn" aria-label="前の月">&#8249;</button>
+            <span class="month-display" id="monthDisplay">----年--月</span>
+            <button class="month-nav-btn" id="nextMonthBtn" aria-label="次の月">&#8250;</button>
+        </div>
+    </div>
+
+    <!-- アップロード -->
+    <div class="upload-section" id="uploadSection">
+        <label class="upload-label" for="csvInput">
+            <div class="upload-icon">📂</div>
+            <div class="upload-text">CSVをアップロード（追加インポート対応）</div>
+            <div class="upload-hint">タップまたはドラッグ&ドロップ</div>
+        </label>
+        <input type="file" id="csvInput" accept=".csv" multiple>
+    </div>
+
+    <!-- ツールバー -->
+    <div class="controls">
+        <button class="btn btn-primary" id="addItemBtn">＋ 項目を追加</button>
+        <button class="btn btn-secondary" id="clearNewBtn">✅ 新着を確認済みに</button>
+        <button class="btn btn-secondary" id="cardManageBtn">💳 カード管理</button>
+        <button class="btn btn-secondary" id="catManageBtn">📊 カテゴリ管理</button>
+        <button class="btn btn-secondary" id="clearBtn">🗑 全削除</button>
+        <button class="btn btn-secondary" id="exportBtn">💾 エクスポート</button>
+        <button class="btn btn-secondary" id="importJsonBtn">📥 JSON復元</button>
+        <input type="file" id="importJsonInput" accept=".json" style="display:none;">
+        <button class="btn btn-secondary" id="cloudSyncBtn">☁️ クラウド同期</button>
+    </div>
+
+    <!-- メインレイアウト（PC: 左=集計・右=リスト、スマホ: 縦積み） -->
+    <div class="main-layout">
+
+        <!-- 左カラム：集計サマリー（PCはstickyカラムで常時表示） -->
+        <aside class="summary-col">
+        <div class="summary-section" id="summarySection">
+        <div class="section-title" style="justify-content:space-between;">
+            <span>💹 集計 <span id="summaryMonthLabel" style="font-size:12px;color:#4a6fa5;font-weight:500;"></span></span>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn btn-secondary" id="copyBtn" style="font-size:12px;padding:6px 12px;min-height:36px;">📋 コピー</button>
+                <button class="summary-toggle-btn" id="summaryToggleBtn">▲ 折りたたむ</button>
+            </div>
+        </div>
+        <!-- 折りたたみ時のミニ表示 -->
+        <div class="summary-mini-bar" id="summaryMiniBar">
+            <span class="smb-chip" id="smb-total">総支出 ¥0</span>
+            <span class="smb-chip" id="smb-burden">自己負担 ¥0</span>
+            <span class="smb-chip green" id="smb-savings">手元残り ¥0</span>
+        </div>
+        <!-- 折りたたみ可能領域 -->
+        <div class="summary-collapsible" id="summaryCollapsible">
+        <!-- ① フローカード -->
+        <div class="summary-card flow-card" style="margin-bottom:10px;padding:16px;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;">
+                <div class="summary-card-label" style="font-size:12px;">総支出額</div>
+                <div class="summary-card-value" id="totalAmount" style="font-size:clamp(20px,4vw,28px);">¥0</div>
+            </div>
+            <div class="flow-bar" id="flowBar">
+                <div class="flow-bar-seg bar-own"     id="barOwn"     style="width:0%"></div>
+                <div class="flow-bar-seg bar-full"    id="barFull"    style="width:0%"></div>
+                <div class="flow-bar-seg bar-partial" id="barPartial" style="width:0%"></div>
+                <div class="flow-bar-seg bar-others"  id="barOthers"  style="width:0%"></div>
+            </div>
+            <div class="flow-legend">
+                <span><span class="legend-dot" style="background:#3b82f6;"></span>自費</span>
+                <span><span class="legend-dot" style="background:#10b981;"></span>全額立替</span>
+                <span><span class="legend-dot" style="background:#f59e0b;"></span>一部（自費分）</span>
+                <span><span class="legend-dot" style="background:#334155;"></span>他者負担</span>
+            </div>
+        </div>
+        <!-- ② 3列 -->
+        <div class="summary-grid-top" style="margin-bottom:10px;">
+            <div class="summary-card">
+                <div class="summary-card-label">👥 他者負担分</div>
+                <div class="summary-card-value" id="othersPay">¥0</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-card-label">🔄 立替回収待ち</div>
+                <div class="summary-card-value" id="toCollect">¥0</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-card-label">💚 回収済み</div>
+                <div class="summary-card-value" id="collectedAmount">¥0</div>
+            </div>
+        </div>
+        <!-- ③ 2列大 -->
+        <div class="summary-grid-bottom" style="margin-bottom:10px;">
+            <div class="summary-card own-card">
+                <div class="summary-card-label">✅ 最終自己負担</div>
+                <div class="summary-card-value" id="finalBurden">¥0</div>
+            </div>
+            <div class="summary-card total-card">
+                <div class="summary-card-label">💳 自分が払う額（＝ 総支出額）</div>
+                <div class="summary-card-value" id="myPayment">¥0</div>
+            </div>
+        </div>
+        <!-- ④ 内訳式 -->
+        <div class="flow-equation" id="flowEquation">
+            データを読み込むと内訳が表示されます
+        </div>
+        <!-- ⑤ カテゴリ別予算 (NEW) -->
+        <div class="cat-budget-section">
+            <div class="cat-budget-section-title">
+                <span>📊 カテゴリ別予算</span>
+                <button class="btn-budget-settings" id="budgetSettingsBtn">⚙ 予算を設定</button>
+            </div>
+            <div id="categoryBudgetSection">
+                <div style="font-size:12px;color:#475569;text-align:center;padding:10px 0;">
+                    カードにカテゴリを設定するか、予算ボタンから設定してください
+                </div>
+            </div>
+        </div>
+        <!-- ⑥ 口座残高パネル -->
+        <div id="balanceSection"></div>
+        </div><!-- end summary-collapsible -->
+        </div><!-- end summary-section -->
+        </aside><!-- end summary-col -->
+
+        <!-- 右カラム：支出項目一覧 -->
+        <div class="items-col">
+        <div class="items-section">
+            <div class="section-title" style="justify-content:space-between;">
+                <span style="display:flex;align-items:center;gap:7px;">📋 支出項目 <span id="itemCount" style="font-size:12px;color:#4a6fa5;font-weight:500;"></span></span>
+            </div>
+            <!-- ソート・フィルタ -->
+            <div class="list-controls">
+                <div class="filter-tabs" id="filterTabs">
+                    <button class="filter-tab active" data-filter="all">全て</button>
+                    <button class="filter-tab" data-filter="own">自費</button>
+                    <button class="filter-tab" data-filter="fullAdvance">全額立替</button>
+                    <button class="filter-tab" data-filter="partialAdvance">一部立替</button>
+                </div>
+                <select class="sort-select" id="sortSelect">
+                    <option value="date-desc">日付順（新）</option>
+                    <option value="date-asc">日付順（古）</option>
+                    <option value="amount-desc">金額（高）</option>
+                    <option value="amount-asc">金額（低）</option>
+                    <option value="type">タイプ別</option>
+                </select>
+            </div>
+            <div id="itemsContainer">
+                <div class="empty-state">
+                    <div class="empty-icon">☁️</div>
+                    <div>CSVをアップロードするか、項目を追加してください</div>
+                </div>
+            </div>
+        </div>
+        </div><!-- end items-col -->
+
+    </div><!-- end main-layout -->
+
+</div>
+
+<script>
+    /* ─────────────────────────────────────────────
+       データ構造メモ
+       items[]: 各支出項目
+         - category: string  カテゴリ名（userCategories の値 or ''）
+           旧カテゴリ（'生活費'/'臨時出費'）はロード時に CATEGORY_MIGRATION で自動移行
+
+       budgets: { [yearMonth: string]: { [category: string]: number } }
+         - キー形式: 'YYYY/M'（例: '2025/1'）
+         - 月ごと・カテゴリごとの予算額を保持
+
+       selectedMonth: string  現在選択中の月 ('YYYY/M' 形式)
+         - 表示・集計の対象月を制御。ページ内遷移のみ（保存しない）
+
+       incomes: { [yearMonth: string]: number }
+         - 手動設定の月収（フォールバック用）。getMonthIncome() が incomeRecords を優先するため
+           incomeRecords に該当月データがある場合は実質的に使用されない
+
+       incomeRecords: { id, name, amount, targetMonth, status, account }[]
+         - 収入の予定・受取済履歴。calcBalances() と getMonthIncome() の両方に影響する
+         - status='pending'  → ACCRUED_INCOME_ACCOUNT（未収入金口座）に加算
+         - status='received' → account で指定した実口座に加算
+         - getMonthIncome(month) = Σ(amount) where targetMonth===month（incomes より優先）
+
+       transfers: { id, date, fromAccount, toAccount, amount, note }[]
+         - 口座間の資金移動履歴。calcBalances() 内で fromAccount を減算・toAccount を加算
+         - 純資産合計への影響はゼロ（ゼロサム）
+
+       cards: string[]
+         - 決済カード一覧（先頭要素 = DEFAULT_CARD、削除不可）
+         - グローバル設定（月をまたいで共有）
+
+       cardBudgets: { [yearMonth: string]: { [cardName: string]: number } }
+         - 月ごと・カード別の利用上限額
+         - カテゴリ予算とは独立した「別軸の内訳」であり、貯金計算には関与しない
+         - 二重計上防止: categoryBudget / cardBudget 両方の集計は同一 items の別ビュー
+    ───────────────────────────────────────────── */
+
+    // ── カテゴリ定義 ──
+    const PRESET_CATEGORIES = Object.freeze(['食費', '固定費/サブスク', '生活・日用品費', '推し活関連', '臨時出費']);
+    // 予算UIに常時固定表示する4カテゴリ（データがなくても非表示にならない）
+    const FIXED_BUDGET_CATEGORIES = Object.freeze(['食費', '固定費/サブスク', '生活・日用品費', '推し活関連']);
+    const FIXED_BUDGET_DEFAULTS = Object.freeze({ '食費': 30000, '固定費/サブスク': 7600, '生活・日用品費': 7400, '推し活関連': 10000 });
+    // 生活費予算から除外して実質貯金計算専用のマイナス要因として扱う特殊カテゴリ
+    const OTHER_CARD_CATEGORY = '他カード引き落とし';
+    let userCategories = [...PRESET_CATEGORIES];
+
+    // デフォルト決済カード（削除不可・items のフォールバック先）
+    const DEFAULT_CARD = '三井住友ゴールドNL';
+
+    // プリセットカード一覧（初回起動 or 旧データ移行時に自動補完される標準カード）
+    const PRESET_CARDS = Object.freeze(['三井住友ゴールドNL', 'EPOS', 'Kyash', 'ANA JCB FIRST']);
+
+    // デフォルト収入・予算（初回/新月に自動適用）
+    const DEFAULT_INCOME  = 120000;
+    const DEFAULT_BUDGETS = Object.freeze({
+        '食費':           30000,
+        '固定費/サブスク':  7600,
+        '生活・日用品費':   7400,
+        '推し活関連':      10000,
+    });
+
+    // 旧カテゴリ → 新カテゴリ 移行マップ（旧名 → 新名）
+    const CATEGORY_MIGRATION = Object.freeze({
+        '生活費':          '生活・日用品費',
+        '固定費・サブスク': '固定費/サブスク',
+    });
+
+    // ── 実資産（口座・現金）管理 ──
+    // 実口座の初期残高合計: 5,000 + 390 + 48 + 125,133 = 130,571 円
+    // ※クレジットカード口座は負債管理用の仮想口座（initial: 0、残高はマイナスになる）
+    // ※未収入金口座は確定済み未来収入を事前入力するプラス仮想口座（initial: 0）
+    const DEFAULT_ACCOUNTS_INIT = Object.freeze([
+        { name: '財布（現金）',              initial: 5000   },
+        { name: '四国労働金庫',              initial: 390    },
+        { name: '三井住友銀行',              initial: 48     },
+        { name: '四国銀行',                  initial: 125133 },
+        { name: 'クレジットカード（後払い）', initial: 0      }, // クレカ未払い残高（負債）
+        { name: '未収入金（予定給与等）',     initial: 0      }, // 確定済み未来収入（プラス仮想口座）
+    ]);
+    // クレカ支払元の定数（accounts に同名エントリが存在し、残高計算に直接反映される）
+    const PAYMENT_SOURCE_CREDIT  = 'クレジットカード（後払い）';
+    // 未収入金口座の定数（支払元には使用不可・純資産のプラス側として機能する）
+    const ACCRUED_INCOME_ACCOUNT = '未収入金（予定給与等）';
+    let accounts = DEFAULT_ACCOUNTS_INIT.map(a => ({ ...a }));
+
+    let items = [];
+    let itemId = 0;
+    let renderPending = false;
+    let sortMode   = 'date-desc';
+    let filterMode = 'all';
+
+    // NEW: 選択中の月・予算データ・収入データ・カードデータ
+    let selectedMonth = getCurrentMonth(); // 'YYYY/M' 形式
+    let budgets = {};                      // budgets['YYYY/M']['食費'] = 30000
+    let incomes = {};                      // incomes['YYYY/M'] = 収入額（円）
+    let cards = [...PRESET_CARDS];         // 決済カード一覧（先頭 = DEFAULT_CARD）
+    let cardBudgets = {};                  // cardBudgets['YYYY/M']['三井住友ゴールドNL'] = 150000
+
+    // 収入レコード: 予定収入・受取済収入の履歴（残高計算に使用）
+    // { id, name, amount, targetMonth ('YYYY/M'), status ('pending'|'received'), account }
+    // pending  → 未収入金（予定給与等）口座に積む
+    // received → 指定 account 口座に加算
+    let incomeRecords  = [];
+    let incomeRecordId = 0;
+
+    // 資金移動: 口座間の移動履歴（純資産合計には影響しない）
+    // { id, date, fromAccount, toAccount, amount, note }
+    let transfers  = [];
+    let transferId = 0;
+
+    const STORAGE_KEY     = 'splitExpenses_v1';
+    const CLOUD_URL_KEY   = 'splitExpenses_cloudUrl';
+    let saveTimer;
+
+    // クラウド同期
+    let cloudSyncUrl  = localStorage.getItem(CLOUD_URL_KEY) || '';
+    let updatedAt     = 0;      // データの最終更新タイムスタンプ (ms)
+    let syncPushTimer = null;   // 保存後の遅延プッシュタイマー
+
+    const uploadSection  = document.getElementById('uploadSection');
+    const csvInput       = document.getElementById('csvInput');
+    const itemsContainer = document.getElementById('itemsContainer');
+    const addItemBtn     = document.getElementById('addItemBtn');
+    const clearNewBtn    = document.getElementById('clearNewBtn');
+    const clearBtn       = document.getElementById('clearBtn');
+    const exportBtn      = document.getElementById('exportBtn');
+
+    /* ─── 月ユーティリティ ─── */
+    function getCurrentMonth() {
+        const now = new Date();
+        return `${now.getFullYear()}/${now.getMonth() + 1}`;
+    }
+
+    // 'YYYY/M' → 'YYYY年M月'
+    function formatMonth(ym) {
+        const [y, m] = ym.split('/');
+        return `${y}年${m}月`;
+    }
+
+    // 月ナビ表示を更新
+    function updateMonthDisplay() {
+        const label = formatMonth(selectedMonth);
+        document.getElementById('monthDisplay').textContent = label;
+        const sl = document.getElementById('summaryMonthLabel');
+        if (sl) sl.textContent = label;
+    }
+
+    // 選択中の月のアイテムを返す
+    function getMonthItems() {
+        return items.filter(item => item.date.startsWith(selectedMonth + '/'));
+    }
+
+    /* ─── localStorage 保存・復元 ─── */
+    function scheduleSave() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => {
+            try {
+                updatedAt = Date.now();
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    items, itemId, budgets, incomes, cards, cardBudgets,
+                    userCategories, accounts,
+                    incomeRecords, incomeRecordId, transfers, transferId,
+                    updatedAt,
+                }));
+            } catch(e) {}
+            // ローカル保存後、クラウドへ遅延プッシュ（連続編集時の無駄なリクエストを抑制）
+            clearTimeout(syncPushTimer);
+            syncPushTimer = setTimeout(() => pushToCloud(), 1500);
+        }, 400);
+    }
+
+    function loadFromStorage() {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) return false;
+            const data = JSON.parse(saved);
+            if (!data.items || !data.items.length) return false;
+            items  = data.items;
+
+            // userCategories を復元（保存済みがあれば尊重、なければプリセット）
+            if (Array.isArray(data.userCategories) && data.userCategories.length > 0) {
+                userCategories = data.userCategories.filter(c => typeof c === 'string' && c.trim());
+                if (userCategories.length === 0) userCategories = [...PRESET_CATEGORIES];
+            }
+
+            // 旧データとの互換: 欠損プロパティをデフォルト補完 + 旧カテゴリを移行
+            items.forEach(item => {
+                if (item.collected === undefined) item.collected = false;
+                if (item.category  === undefined) item.category  = '';
+                if (item.isSpecial === undefined) item.isSpecial = false;
+                // CATEGORY_MIGRATION で旧名を変換した後、userCategories にない値は '' に落とす
+                // OTHER_CARD_CATEGORY は userCategories 外の特殊カテゴリなので移行対象外
+                if (item.category !== '' && item.category !== OTHER_CARD_CATEGORY && !userCategories.includes(item.category)) {
+                    item.category = CATEGORY_MIGRATION[item.category] ?? '';
+                }
+                // 変換後もまだ userCategories にない場合は '' にする（カスタム削除後の残骸）
+                if (item.category !== '' && item.category !== OTHER_CARD_CATEGORY && !userCategories.includes(item.category)) {
+                    item.category = '';
+                }
+            });
+            itemId  = typeof data.itemId === 'number' ? data.itemId : items.length;
+
+            // 予算データの旧キーを移行（旧カテゴリ → 新カテゴリ or 削除）
+            const rawBudgets = data.budgets || {};
+            Object.values(rawBudgets).forEach(mb => {
+                Object.keys(CATEGORY_MIGRATION).forEach(oldKey => {
+                    if (mb[oldKey] === undefined) return;
+                    const newKey = CATEGORY_MIGRATION[oldKey];
+                    // 移行先があり、かつ移行先がまだ未設定の場合のみ引き継ぐ
+                    if (newKey && mb[newKey] === undefined) {
+                        mb[newKey] = mb[oldKey];
+                    }
+                    delete mb[oldKey]; // 旧キーは必ず除去
+                });
+            });
+            budgets = rawBudgets;
+            incomes = data.incomes || {};
+
+            // カード一覧を復元
+            const savedCards = Array.isArray(data.cards) ? data.cards.filter(Boolean) : [];
+            if (savedCards.length <= 1 && (!savedCards[0] || savedCards[0] === DEFAULT_CARD)) {
+                // 旧デフォルト（三井住友ゴールドNLのみ）または未保存 → プリセット全体を適用
+                cards = [...PRESET_CARDS];
+            } else {
+                // ユーザーがカスタマイズ済み → 設定を尊重しつつ DEFAULT_CARD を先頭に保証
+                cards = savedCards.includes(DEFAULT_CARD)
+                    ? savedCards
+                    : [DEFAULT_CARD, ...savedCards.filter(c => c !== DEFAULT_CARD)];
+                // 今回追加されたプリセットカードが未登録なら末尾に補完
+                PRESET_CARDS.forEach(c => { if (!cards.includes(c)) cards.push(c); });
+            }
+
+            cardBudgets = data.cardBudgets || {};
+
+            // 口座残高データ復元
+            if (Array.isArray(data.accounts) && data.accounts.length > 0) {
+                accounts = data.accounts;
+            } else {
+                accounts = DEFAULT_ACCOUNTS_INIT.map(a => ({ ...a }));
+            }
+            // 旧データの「その他」口座名を「四国銀行」にリネーム
+            accounts.forEach(a => { if (a.name === 'その他') a.name = '四国銀行'; });
+            // 旧データに CC 仮想口座が存在しない場合は自動補完
+            if (!accounts.some(a => a.name === PAYMENT_SOURCE_CREDIT)) {
+                accounts.push({ name: PAYMENT_SOURCE_CREDIT, initial: 0 });
+            }
+            // 旧データに未収入金口座が存在しない場合は自動補完
+            if (!accounts.some(a => a.name === ACCRUED_INCOME_ACCOUNT)) {
+                accounts.push({ name: ACCRUED_INCOME_ACCOUNT, initial: 0 });
+            }
+
+            // ── ワンタイム残高補正パッチ (balance_patch_202606) ──
+            // フラグが未設定の場合のみ実行し、以降は完全にスキップする（冪等性担保）
+            if (!localStorage.getItem('balance_patch_202606')) {
+                const shikoku = accounts.find(a => a.name === '四国銀行');
+                if (shikoku) shikoku.initial += 3968;
+                const smbc = accounts.find(a => a.name === '三井住友銀行');
+                if (smbc) smbc.initial += 1470;
+                localStorage.setItem('balance_patch_202606', '1');
+            }
+
+            // incomeRecords 復元（旧 incomeEntries からの自動移行対応）
+            incomeRecords  = Array.isArray(data.incomeRecords)  ? data.incomeRecords  : [];
+            incomeRecordId = typeof data.incomeRecordId === 'number' ? data.incomeRecordId : incomeRecords.length;
+            // 旧 incomeEntries が存在し、incomeRecords が空の場合はワンタイム移行
+            if (incomeRecords.length === 0 && Array.isArray(data.incomeEntries) && data.incomeEntries.length > 0) {
+                data.incomeEntries.forEach(e => {
+                    incomeRecords.push({
+                        id: incomeRecordId++,
+                        name: e.note || '収入',
+                        amount: e.amount,
+                        targetMonth: e.month || '',
+                        status: 'received',
+                        account: e.destination || '四国銀行',
+                    });
+                });
+            }
+
+            // transfers 復元
+            transfers  = Array.isArray(data.transfers)  ? data.transfers  : [];
+            transferId = typeof data.transferId === 'number' ? data.transferId : transfers.length;
+
+            // updatedAt 復元
+            updatedAt = typeof data.updatedAt === 'number' ? data.updatedAt : 0;
+
+            // item.card のマイグレーション: 未設定 or 削除済みカード → DEFAULT_CARD
+            items.forEach(item => {
+                if (!item.card || !cards.includes(item.card)) item.card = DEFAULT_CARD;
+                // paymentSource: カードが紐づく支出 → CC口座、カードなし → 四国銀行
+                // ※前回「四国銀行」に一括統合したクレカ分をここで正しい負債口座へ救済する
+                item.paymentSource = item.card ? PAYMENT_SOURCE_CREDIT : '四国銀行';
+            });
+
+            return true;
+        } catch(e) { return false; }
+    }
+
+    /* ─── 月次収入の取得 (incomeRecords 優先 → incomes フォールバック) ─── */
+    function getMonthIncome(month) {
+        const fromRecords = incomeRecords
+            .filter(r => r.targetMonth === month)
+            .reduce((sum, r) => sum + r.amount, 0);
+        // incomeRecords に該当月のデータがあればそれを返す。なければ手動設定 incomes[month] を返す。
+        return fromRecords > 0 ? fromRecords : (incomes[month] || 0);
+    }
+
+    /* ─── デフォルト収入・予算の初期化 ─── */
+    // income も budget も両方未設定の月にのみデフォルトを適用する。
+    // どちらか一方でもユーザーが触れた月は上書きしない（意図的な 0 設定を尊重）。
+    function applyMonthDefaults(month) {
+        // incomeRecords に該当月のレコードがあればそちらを優先するため income は設定しない
+        const hasRecords = incomeRecords.some(r => r.targetMonth === month);
+        const hasIncome  = hasRecords || incomes[month] !== undefined;
+        const hasBudgets = budgets[month] !== undefined;
+        if (hasIncome || hasBudgets) return; // ユーザー設定済み → スキップ
+
+        incomes[month] = DEFAULT_INCOME;
+        // 4固定カテゴリのデフォルト予算を適用
+        budgets[month] = { ...FIXED_BUDGET_DEFAULTS };
+        scheduleSave();
+    }
+
+    /* ─── スケジューリング ─── */
+    function scheduleRender() {
+        if (renderPending) return;
+        renderPending = true;
+        requestAnimationFrame(() => { render(); renderPending = false; scheduleSave(); });
+    }
+
+    /* ─── 月ナビ ─── */
+    document.getElementById('prevMonthBtn').addEventListener('click', () => {
+        const [y, m] = selectedMonth.split('/').map(Number);
+        selectedMonth = (m === 1) ? `${y - 1}/12` : `${y}/${m - 1}`;
+        updateMonthDisplay();
+        applyMonthDefaults(selectedMonth); // 未設定月にデフォルトを適用
+        scheduleRender();
+    });
+
+    document.getElementById('nextMonthBtn').addEventListener('click', () => {
+        const [y, m] = selectedMonth.split('/').map(Number);
+        selectedMonth = (m === 12) ? `${y + 1}/1` : `${y}/${m + 1}`;
+        updateMonthDisplay();
+        applyMonthDefaults(selectedMonth); // 未設定月にデフォルトを適用
+        scheduleRender();
+    });
+
+    /* ─── CSV処理 ─── */
+    uploadSection.addEventListener('dragover',  e => { e.preventDefault(); uploadSection.classList.add('dragover'); });
+    uploadSection.addEventListener('dragleave', () => uploadSection.classList.remove('dragover'));
+    uploadSection.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadSection.classList.remove('dragover');
+        [...e.dataTransfer.files].forEach(f => f.name.endsWith('.csv') && handleCSVFile(f));
+    });
+    csvInput.addEventListener('change', e => {
+        [...e.target.files].forEach(f => handleCSVFile(f));
+        e.target.value = '';
+    });
+
+    function handleCSVFile(file) {
+        const tryRead = encoding => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload  = e => resolve(e.target.result);
+            reader.onerror = reject;
+            reader.readAsText(file, encoding);
+        });
+
+        tryRead('shift-jis').then(csv => {
+            const lines = csv.split(/\r?\n/).filter(l => l.trim());
+
+            const allRows = [];
+            lines.forEach((line, idx) => {
+                const parts = line.split(',');
+                if (parts.length < 7) return;
+                if (!parts[0].match(/^\d{4}\/\d{1,2}\/\d{1,2}/)) return;
+                const date   = parts[0].trim();
+                const name   = parts[1].trim() || `項目 ${idx + 1}`;
+                const amount = parseInt(parts[6].trim());
+                if (!amount || amount === 0) return;
+                allRows.push({ date, name, amount, rowIdx: idx });
+            });
+
+            const refundPairs = detectRefundPairs(allRows);
+
+            if (refundPairs.length > 0) {
+                showRefundModal(refundPairs,
+                    () => {
+                        const excludeIdxs = new Set(
+                            refundPairs.flatMap(p => [p.positive.rowIdx, p.negative.rowIdx])
+                        );
+                        importRows(allRows.filter(r => !excludeIdxs.has(r.rowIdx) && r.amount > 0));
+                    },
+                    () => { importRows(allRows.filter(r => r.amount > 0)); }
+                );
+            } else {
+                importRows(allRows.filter(r => r.amount > 0));
+            }
+        }).catch(() => showNotification('読み込みに失敗しました', 'error'));
+    }
+
+    /* ─── 返金ペア検出 ─── */
+    function detectRefundPairs(rows) {
+        const pairs = [];
+        const used  = new Set();
+        const negRows = rows.filter(r => r.amount < 0);
+        const posRows = rows.filter(r => r.amount > 0);
+        negRows.forEach(neg => {
+            if (used.has(neg.rowIdx)) return;
+            const pos = posRows.find(p =>
+                !used.has(p.rowIdx) && p.name === neg.name && p.amount === -neg.amount
+            );
+            if (pos) {
+                pairs.push({ positive: pos, negative: neg });
+                used.add(pos.rowIdx);
+                used.add(neg.rowIdx);
+            }
+        });
+        return pairs;
+    }
+
+    /* ─── 行を items に追加（重複チェック込み） ─── */
+    function importRows(rows) {
+        const newItems = [];
+        rows.forEach(row => {
+            const dup = items.some(i =>
+                i.date === row.date && i.name === row.name && i.originalAmount === row.amount
+            );
+            if (dup) return;
+            newItems.push({
+                id: itemId++,
+                date: row.date,
+                name: row.name,
+                originalAmount: row.amount,
+                type: 'own',
+                amount: row.amount,
+                imported: true,
+                isNew: true,
+                collected: false,
+                category: '',
+                card: cards[0] || DEFAULT_CARD,
+                paymentSource: PAYMENT_SOURCE_CREDIT, // CSV はカード決済のためCC口座がデフォルト
+                isSpecial: false,
+            });
+        });
+
+        if (newItems.length === 0) {
+            showNotification('新しい項目はありませんでした', 'info');
+        } else {
+            items = [...items, ...newItems];
+            // インポートした項目の月に自動移動（異なる月のデータでも確認できるように）
+            if (newItems.length > 0) {
+                const firstDate = newItems[0].date;
+                const parts = firstDate.split('/');
+                if (parts.length >= 2) {
+                    const importedMonth = `${parts[0]}/${parseInt(parts[1])}`;
+                    if (importedMonth !== selectedMonth) {
+                        selectedMonth = importedMonth;
+                        updateMonthDisplay();
+                    }
+                }
+            }
+            showNotification(`${newItems.length}件の項目を追加しました ✨`);
+            scheduleRender();
+        }
+    }
+
+    /* ─── 返金確認モーダル ─── */
+    function showRefundModal(pairs, onExcludePairs, onSkipNegOnly) {
+        document.getElementById('refundModal')?.remove();
+
+        const pairRows = pairs.map(p => `
+            <div class="modal-pair-row">
+                <div class="modal-pair-date">${escHtml(p.positive.date)}</div>
+                <div class="modal-pair-name">${escHtml(p.positive.name)}</div>
+                <div class="modal-pair-pos">+¥${p.positive.amount.toLocaleString()}</div>
+                <div class="modal-pair-arr">→</div>
+                <div class="modal-pair-neg">−¥${(-p.negative.amount).toLocaleString()}</div>
+            </div>`).join('');
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.id = 'refundModal';
+        overlay.innerHTML = `
+            <div class="modal-box" role="dialog" aria-modal="true">
+                <div class="modal-icon">⚠️</div>
+                <div class="modal-title">返金処理が検出されました</div>
+                <div class="modal-desc">
+                    以下の取引は購入後に同額の返金（マイナス決済）が記録されており、<br>
+                    実質的に決済が取り消されています。どのように読み込みますか？
+                </div>
+                <div class="modal-pairs">
+                    <div class="modal-pair-header">🔄 返金ペア（${pairs.length}件）</div>
+                    ${pairRows}
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-main" id="modalBtnExclude">
+                        <span>🗑️</span>
+                        <div class="modal-btn-content">
+                            <span>返金ペアを両方除外して読み込む（推奨）</span>
+                            <span class="modal-btn-desc">購入行・返金行をどちらも取り込まない</span>
+                        </div>
+                    </button>
+                    <button class="modal-btn modal-btn-sub" id="modalBtnSkip">
+                        <span>➕</span>
+                        <div class="modal-btn-content">
+                            <span>購入行だけ読み込む</span>
+                            <span class="modal-btn-desc">返金行は無視し、購入取引として記録する</span>
+                        </div>
+                    </button>
+                    <button class="modal-btn modal-btn-cancel" id="modalBtnCancel">キャンセル</button>
+                </div>
+            </div>`;
+
+        overlay.querySelector('#modalBtnExclude').addEventListener('click', () => { overlay.remove(); onExcludePairs(); });
+        overlay.querySelector('#modalBtnSkip').addEventListener('click', () => { overlay.remove(); onSkipNegOnly(); });
+        overlay.querySelector('#modalBtnCancel').addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
+
+    /* ─── 予算設定モーダル (NEW) ─── */
+    function showBudgetModal() {
+        document.getElementById('budgetModal')?.remove();
+
+        const monthBudgets = budgets[selectedMonth] || {};
+        const hasIncomeRecords = incomeRecords.some(r => r.targetMonth === selectedMonth);
+        const currentIncome = hasIncomeRecords ? getMonthIncome(selectedMonth) : (incomes[selectedMonth] || '');
+
+        // 固定4カテゴリを先頭に常時表示し、その他の userCategories を追加
+        const allCatsForModal = [
+            ...FIXED_BUDGET_CATEGORIES,
+            ...userCategories.filter(cat => !FIXED_BUDGET_CATEGORIES.includes(cat))
+        ];
+        const inputRows = allCatsForModal.map(cat => {
+            const isFixed = FIXED_BUDGET_CATEGORIES.includes(cat);
+            const defVal  = isFixed ? FIXED_BUDGET_DEFAULTS[cat] : 0;
+            const curVal  = monthBudgets[cat] !== undefined ? monthBudgets[cat] : (isFixed ? defVal : '');
+            return `
+            <div class="budget-input-row${isFixed ? ' fixed-cat' : ''}">
+                <label>${escHtml(cat)}</label>
+                <div class="budget-input-wrap">
+                    <input class="budget-amount-input" type="number"
+                        data-cat="${escAttr(cat)}"
+                        value="${curVal}"
+                        placeholder="${defVal || 0}" inputmode="numeric" min="0"
+                        ${isFixed ? 'style="border-color:rgba(96,165,250,0.55);"' : ''}>
+                    <span class="budget-unit">円</span>
+                </div>
+            </div>`;
+        }).join('');
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.id = 'budgetModal';
+        overlay.innerHTML = `
+            <div class="modal-box budget-modal-box" role="dialog" aria-modal="true">
+                <div class="modal-icon">💰</div>
+                <div class="modal-title blue">${escHtml(formatMonth(selectedMonth))} 収入・予算設定</div>
+                <div class="modal-desc">収入と各カテゴリの予算を設定すると貯金額を自動計算します</div>
+
+                <!-- 収入入力 -->
+                <div class="budget-income-block">
+                    <div class="budget-block-heading" style="color:#34d399;">💴 今月の収入（手取り）</div>
+                    ${hasIncomeRecords ? `
+                    <div style="padding:8px 0 0;font-size:12px;color:#34d399;font-weight:700;">
+                        ¥${getMonthIncome(selectedMonth).toLocaleString()}
+                        <span style="font-size:10px;color:#64748b;font-weight:400;margin-left:6px;">収入レコードから自動算出（下の入力は無効）</span>
+                    </div>
+                    <input type="hidden" id="budgetIncomeInput" value="${currentIncome}">` : `
+                    <div class="budget-input-row" style="border-bottom:none;padding:8px 0 0;">
+                        <label style="color:#6ee7b7;min-width:48px;">収入</label>
+                        <div class="budget-input-wrap">
+                            <input class="budget-amount-input income-input" type="number"
+                                id="budgetIncomeInput"
+                                value="${currentIncome}"
+                                placeholder="未入力" inputmode="numeric" min="0"
+                                style="border-color:rgba(52,211,153,0.4);">
+                            <span class="budget-unit">円</span>
+                        </div>
+                    </div>`}
+                </div>
+
+                <div class="budget-section-divider"></div>
+
+                <!-- カテゴリ別予算 -->
+                <div class="budget-block-heading" style="color:#94a3b8;">📊 カテゴリ別予算（貯金計算に使用）</div>
+                <div class="budget-input-rows" style="margin-top:8px;">${inputRows}</div>
+
+                <div class="budget-section-divider"></div>
+
+                <!-- カード別予算上限 -->
+                <div class="budget-block-heading" style="color:#a78bfa;">💳 カード別利用上限（参考管理用）</div>
+                <div style="font-size:10px;color:#475569;margin:4px 0 8px;line-height:1.5;">
+                    カテゴリ予算とは独立した別軸の集計です。貯金計算には影響しません。
+                </div>
+                <div class="budget-input-rows" style="margin-top:0;" id="cardBudgetInputsWrap">
+                    ${cards.map(c => {
+                        const cb = (cardBudgets[selectedMonth] || {})[c] || '';
+                        return `<div class="budget-input-row">
+                            <label style="color:#c4b5fd;">${escHtml(c)}</label>
+                            <div class="budget-input-wrap">
+                                <input class="budget-amount-input" type="number"
+                                    data-card="${escAttr(c)}"
+                                    value="${cb}"
+                                    placeholder="上限なし" inputmode="numeric" min="0"
+                                    style="border-color:rgba(167,139,250,0.35);">
+                                <span class="budget-unit">円</span>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>
+
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-main blue-btn" id="budgetSaveBtn">💾 保存する</button>
+                    <button class="modal-btn modal-btn-cancel" id="budgetCancelBtn">キャンセル</button>
+                </div>
+            </div>`;
+
+        overlay.querySelector('#budgetSaveBtn').addEventListener('click', () => {
+            // 収入を保存（incomeRecords がある月は手動上書きしない — getMonthIncome が優先）
+            if (!hasIncomeRecords) {
+                const incomeVal = parseInt(overlay.querySelector('#budgetIncomeInput').value) || 0;
+                if (incomeVal > 0) incomes[selectedMonth] = incomeVal;
+                else               delete incomes[selectedMonth];
+            }
+
+            // カテゴリ予算を保存（data-cat セレクタで限定）
+            if (!budgets[selectedMonth]) budgets[selectedMonth] = {};
+            overlay.querySelectorAll('.budget-amount-input[data-cat]').forEach(input => {
+                const cat = input.dataset.cat;
+                const val = parseInt(input.value) || 0;
+                const isFixed = FIXED_BUDGET_CATEGORIES.includes(cat);
+                if (val > 0) {
+                    budgets[selectedMonth][cat] = val;
+                } else if (isFixed) {
+                    // 固定カテゴリは0入力でもデフォルト値を保持（削除しない）
+                    budgets[selectedMonth][cat] = FIXED_BUDGET_DEFAULTS[cat];
+                } else {
+                    delete budgets[selectedMonth][cat];
+                }
+            });
+            if (Object.keys(budgets[selectedMonth]).length === 0) delete budgets[selectedMonth];
+
+            // カード別予算を保存（data-card セレクタで限定、カテゴリと混在しない）
+            if (!cardBudgets[selectedMonth]) cardBudgets[selectedMonth] = {};
+            overlay.querySelectorAll('.budget-amount-input[data-card]').forEach(input => {
+                const cardName = input.dataset.card;
+                const val = parseInt(input.value) || 0;
+                if (val > 0) cardBudgets[selectedMonth][cardName] = val;
+                else         delete cardBudgets[selectedMonth][cardName];
+            });
+            if (Object.keys(cardBudgets[selectedMonth]).length === 0) delete cardBudgets[selectedMonth];
+
+            overlay.remove();
+            scheduleSave();
+            updateCategoryBudget(getMonthItems());
+            showNotification(`${formatMonth(selectedMonth)}の設定を保存しました 💰`);
+        });
+
+        overlay.querySelector('#budgetCancelBtn').addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
+
+    document.getElementById('budgetSettingsBtn').addEventListener('click', showBudgetModal);
+
+    /* ─── カード管理モーダル ─── */
+    function showCardManageModal() {
+        document.getElementById('cardManageModal')?.remove();
+
+        const renderList = (overlay) => {
+            const list = overlay.querySelector('#cardManageList');
+            list.innerHTML = cards.map((c, idx) => `
+                <div class="card-manage-row" data-idx="${idx}">
+                    <span class="card-manage-name">${escHtml(c)}</span>
+                    ${idx === 0
+                        ? '<span class="card-manage-badge">デフォルト</span>'
+                        : `<button class="btn-card-remove" data-idx="${idx}">削除</button>`}
+                </div>`).join('');
+
+            // 削除ボタンイベントを再バインド
+            list.querySelectorAll('.btn-card-remove').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = +btn.dataset.idx;
+                    const removedCard = cards[idx];
+
+                    // このカードを使っているアイテム数を確認
+                    const affected = items.filter(i => i.card === removedCard).length;
+                    const msg = affected > 0
+                        ? `「${removedCard}」を削除します。\n使用中の${affected}件はデフォルトカードに移行されます。\n続行しますか？`
+                        : `「${removedCard}」を削除しますか？`;
+                    if (!confirm(msg)) return;
+
+                    // items のカードをデフォルトに移行
+                    items.forEach(item => {
+                        if (item.card === removedCard) item.card = DEFAULT_CARD;
+                    });
+                    // cardBudgets からも除去
+                    Object.values(cardBudgets).forEach(cb => { delete cb[removedCard]; });
+
+                    cards.splice(idx, 1);
+                    scheduleSave();
+                    scheduleRender();
+                    renderList(overlay); // リストを再描画
+                    showNotification(`「${removedCard}」を削除しました`);
+                });
+            });
+        };
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.id = 'cardManageModal';
+        overlay.innerHTML = `
+            <div class="modal-box budget-modal-box" role="dialog" aria-modal="true"
+                 style="border-color:rgba(167,139,250,0.4);">
+                <div class="modal-icon">💳</div>
+                <div class="modal-title blue" style="color:#a78bfa;">決済カード管理</div>
+                <div class="modal-desc">
+                    カードを追加・削除できます。<br>
+                    デフォルトカード（${escHtml(DEFAULT_CARD)}）は削除できません。
+                </div>
+                <div class="card-manage-list" id="cardManageList"></div>
+                <div class="card-add-row">
+                    <input class="card-name-input" id="newCardName" type="text"
+                        placeholder="新しいカード名を入力" maxlength="40">
+                    <button class="btn-card-add" id="addCardBtn">＋ 追加</button>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-cancel" id="cardManageClose"
+                        style="background:rgba(100,116,155,0.15);color:#a5b4fc;
+                               border:1px solid rgba(148,163,184,0.25);border-radius:10px;
+                               padding:12px;font-weight:700;">
+                        閉じる
+                    </button>
+                </div>
+            </div>`;
+
+        renderList(overlay);
+
+        overlay.querySelector('#addCardBtn').addEventListener('click', () => {
+            const input = overlay.querySelector('#newCardName');
+            const name  = input.value.trim();
+            if (!name) { showNotification('カード名を入力してください', 'info'); return; }
+            if (cards.includes(name)) { showNotification('同名のカードが既に存在します', 'info'); return; }
+            cards.push(name);
+            input.value = '';
+            scheduleSave();
+            renderList(overlay);
+            scheduleRender(); // カード選択肢を更新
+            showNotification(`「${name}」を追加しました 💳`);
+        });
+
+        // Enter キーでも追加
+        overlay.querySelector('#newCardName').addEventListener('keydown', e => {
+            if (e.key === 'Enter') overlay.querySelector('#addCardBtn').click();
+        });
+
+        overlay.querySelector('#cardManageClose').addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
+
+    document.getElementById('cardManageBtn').addEventListener('click', showCardManageModal);
+
+    /* ─── JSON復元インポート ─── */
+    document.getElementById('importJsonBtn').addEventListener('click', () => {
+        document.getElementById('importJsonInput').click();
+    });
+    document.getElementById('importJsonInput').addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        e.target.value = '';
+        const reader = new FileReader();
+        reader.onload = ev => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                // バージョンチェック
+                if (!data.items || !Array.isArray(data.items)) {
+                    showNotification('不正なJSONファイルです', 'error'); return;
+                }
+                const count = data.items.length;
+                if (!confirm(`JSONバックアップから復元します。\n現在のデータ（${items.length}件）はすべて上書きされます。\n\n復元件数: ${count}件\nよろしいですか？`)) return;
+
+                // データを復元
+                items         = data.items.map(i => ({
+                    collected: false, category: '', card: DEFAULT_CARD,
+                    isSpecial: false, isNew: false,
+                    ...i,
+                    // カードが紐づく支出 → CC口座、カードなし → 四国銀行
+                    paymentSource: (i.card && i.card !== '') ? PAYMENT_SOURCE_CREDIT : '四国銀行',
+                }));
+                itemId        = typeof data.itemId === 'number' ? data.itemId : items.length;
+                budgets       = data.budgets       || {};
+                incomes       = data.incomes       || {};
+                cards         = Array.isArray(data.cards) && data.cards.length ? data.cards : [...PRESET_CARDS];
+                cardBudgets   = data.cardBudgets   || {};
+                userCategories = Array.isArray(data.userCategories) && data.userCategories.length
+                    ? data.userCategories : [...PRESET_CATEGORIES];
+                accounts      = Array.isArray(data.accounts) && data.accounts.length
+                    ? data.accounts : DEFAULT_ACCOUNTS_INIT.map(a => ({...a}));
+                // 旧「その他」口座名を「四国銀行」にリネーム
+                accounts.forEach(a => { if (a.name === 'その他') a.name = '四国銀行'; });
+                // CC 仮想口座が未登録なら補完
+                if (!accounts.some(a => a.name === PAYMENT_SOURCE_CREDIT)) {
+                    accounts.push({ name: PAYMENT_SOURCE_CREDIT, initial: 0 });
+                }
+                // 未収入金口座が未登録なら補完
+                if (!accounts.some(a => a.name === ACCRUED_INCOME_ACCOUNT)) {
+                    accounts.push({ name: ACCRUED_INCOME_ACCOUNT, initial: 0 });
+                }
+                incomeRecords = Array.isArray(data.incomeRecords) ? data.incomeRecords : [];
+                incomeRecordId = typeof data.incomeRecordId === 'number' ? data.incomeRecordId : incomeRecords.length;
+                // 旧 incomeEntries が存在し、incomeRecords が空なら移行
+                if (incomeRecords.length === 0 && Array.isArray(data.incomeEntries) && data.incomeEntries.length > 0) {
+                    data.incomeEntries.forEach(e => {
+                        incomeRecords.push({
+                            id: incomeRecordId++,
+                            name: e.note || '収入',
+                            amount: e.amount,
+                            targetMonth: e.month || '',
+                            status: 'received',
+                            account: e.destination || '四国銀行',
+                        });
+                    });
+                }
+                transfers = Array.isArray(data.transfers) ? data.transfers : [];
+                transferId = typeof data.transferId === 'number' ? data.transferId : transfers.length;
+
+                // DEFAULT_CARD を先頭に保証
+                if (!cards.includes(DEFAULT_CARD)) cards.unshift(DEFAULT_CARD);
+
+                scheduleSave();
+                scheduleRender();
+                updateBalanceDOM();
+                showNotification(`${count}件のデータを復元しました ✅`);
+            } catch(err) {
+                showNotification('JSONの解析に失敗しました', 'error');
+            }
+        };
+        reader.readAsText(file);
+    });
+
+    /* ─── カテゴリ管理モーダル ─── */
+    function showCategoryManageModal() {
+        document.getElementById('catManageModal')?.remove();
+
+        const renderList = (overlay) => {
+            const list = overlay.querySelector('#catManageList');
+            list.innerHTML = userCategories.map((cat, idx) => `
+                <div class="cat-manage-row" data-idx="${idx}">
+                    <span class="cat-manage-name">${escHtml(cat)}</span>
+                    <button class="btn-cat-rename" data-idx="${idx}">編集</button>
+                    <button class="btn-cat-remove" data-idx="${idx}">削除</button>
+                </div>`).join('');
+
+            // 編集ボタン: インライン入力に切り替え
+            list.querySelectorAll('.btn-cat-rename').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx  = +btn.dataset.idx;
+                    const row  = list.querySelector(`.cat-manage-row[data-idx="${idx}"]`);
+                    const oldName = userCategories[idx];
+                    row.innerHTML = `
+                        <input class="cat-edit-input" value="${escAttr(oldName)}" maxlength="40">
+                        <button class="btn-cat-save">保存</button>
+                        <button class="btn-cat-cancel-edit">✕</button>`;
+
+                    row.querySelector('.btn-cat-cancel-edit').addEventListener('click', () => renderList(overlay));
+
+                    const doSave = () => {
+                        const newName = row.querySelector('.cat-edit-input').value.trim();
+                        if (!newName) { showNotification('カテゴリ名を入力してください', 'info'); return; }
+                        if (newName === oldName) { renderList(overlay); return; }
+                        if (userCategories.includes(newName)) {
+                            showNotification('同名のカテゴリが既に存在します', 'info'); return;
+                        }
+                        // items の category を移行
+                        items.forEach(item => { if (item.category === oldName) item.category = newName; });
+                        // budgets の全月のキーを移行
+                        Object.values(budgets).forEach(mb => {
+                            if (mb[oldName] !== undefined) {
+                                if (mb[newName] === undefined) mb[newName] = mb[oldName];
+                                delete mb[oldName];
+                            }
+                        });
+                        userCategories[idx] = newName;
+                        scheduleSave();
+                        scheduleRender();
+                        renderList(overlay);
+                        updateCategoryBudget(getMonthItems());
+                        showNotification(`「${oldName}」→「${newName}」に変更しました`);
+                    };
+
+                    row.querySelector('.btn-cat-save').addEventListener('click', doSave);
+                    row.querySelector('.cat-edit-input').addEventListener('keydown', e => {
+                        if (e.key === 'Enter') doSave();
+                        if (e.key === 'Escape') renderList(overlay);
+                    });
+                    row.querySelector('.cat-edit-input').focus();
+                });
+            });
+
+            // 削除ボタン
+            list.querySelectorAll('.btn-cat-remove').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const idx = +btn.dataset.idx;
+                    const removedCat = userCategories[idx];
+
+                    const affected = items.filter(i => i.category === removedCat).length;
+                    const msg = affected > 0
+                        ? `「${removedCat}」を削除します。\n使用中の${affected}件のカテゴリが未設定になります。\n続行しますか？`
+                        : `「${removedCat}」を削除しますか？`;
+                    if (!confirm(msg)) return;
+
+                    // items のカテゴリを未設定に移行
+                    items.forEach(item => { if (item.category === removedCat) item.category = ''; });
+                    // budgets の全月からキーを除去
+                    Object.values(budgets).forEach(mb => { delete mb[removedCat]; });
+
+                    userCategories.splice(idx, 1);
+                    scheduleSave();
+                    scheduleRender();
+                    renderList(overlay);
+                    updateCategoryBudget(getMonthItems());
+                    showNotification(`「${removedCat}」を削除しました`);
+                });
+            });
+        };
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.id = 'catManageModal';
+        overlay.innerHTML = `
+            <div class="modal-box budget-modal-box" role="dialog" aria-modal="true"
+                 style="border-color:rgba(52,211,153,0.4);">
+                <div class="modal-icon">📊</div>
+                <div class="modal-title blue" style="color:#34d399;">予算カテゴリ管理</div>
+                <div class="modal-desc">
+                    カテゴリの追加・名称変更・削除ができます。<br>
+                    削除すると、そのカテゴリのアイテムは「未設定」になります。
+                </div>
+                <div class="cat-manage-list" id="catManageList"></div>
+                <div class="card-add-row">
+                    <input class="card-name-input" id="newCatName" type="text"
+                        placeholder="新しいカテゴリ名を入力" maxlength="40"
+                        style="border-color:rgba(52,211,153,0.3);">
+                    <button class="btn-card-add" id="addCatBtn"
+                        style="background:linear-gradient(135deg,rgba(52,211,153,0.3),rgba(16,185,129,0.3));
+                               border-color:rgba(52,211,153,0.4);color:#6ee7b7;">
+                        ＋ 追加
+                    </button>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-cancel" id="catManageClose"
+                        style="background:rgba(100,116,155,0.15);color:#6ee7b7;
+                               border:1px solid rgba(52,211,153,0.25);border-radius:10px;
+                               padding:12px;font-weight:700;">
+                        閉じる
+                    </button>
+                </div>
+            </div>`;
+
+        renderList(overlay);
+
+        overlay.querySelector('#addCatBtn').addEventListener('click', () => {
+            const input = overlay.querySelector('#newCatName');
+            const name  = input.value.trim();
+            if (!name) { showNotification('カテゴリ名を入力してください', 'info'); return; }
+            if (userCategories.includes(name)) { showNotification('同名のカテゴリが既に存在します', 'info'); return; }
+            userCategories.push(name);
+            input.value = '';
+            scheduleSave();
+            scheduleRender(); // カテゴリ選択肢を更新
+            renderList(overlay);
+            showNotification(`「${name}」を追加しました 📊`);
+        });
+
+        overlay.querySelector('#newCatName').addEventListener('keydown', e => {
+            if (e.key === 'Enter') overlay.querySelector('#addCatBtn').click();
+        });
+
+        overlay.querySelector('#catManageClose').addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
+
+    document.getElementById('catManageBtn').addEventListener('click', showCategoryManageModal);
+
+    /* ─── ボタン操作 ─── */
+    addItemBtn.addEventListener('click', () => {
+        // 選択中の月が現在月なら今日の日付、それ以外は月初日
+        const today = new Date();
+        const todayMonth = `${today.getFullYear()}/${today.getMonth() + 1}`;
+        let date;
+        if (selectedMonth === todayMonth) {
+            date = `${today.getFullYear()}/${today.getMonth() + 1}/${today.getDate()}`;
+        } else {
+            const [y, m] = selectedMonth.split('/');
+            date = `${y}/${m}/1`;
+        }
+        const newItemId = itemId; // push 前に確保（item.id と一致）
+        items.push({
+            id: itemId++, date, name: '', originalAmount: 0,
+            type: 'own', amount: 0, imported: false,
+            isNew: true,  // 常にリスト先頭に固定表示、確認済みボタンで解除
+            collected: false, category: '',
+            card: cards[0] || DEFAULT_CARD,
+            paymentSource: PAYMENT_SOURCE_CREDIT, // カードが紐づくためCC口座がデフォルト
+            isSpecial: false,
+        });
+        renderPending = true;
+        requestAnimationFrame(() => {
+            render();
+            renderPending = false;
+            scheduleSave();
+            requestAnimationFrame(() => {
+                // data-id で該当カードを特定してスクロール（末尾カードと混同しない）
+                const newCard = itemsContainer.querySelector(`.item-card[data-id="${newItemId}"]`);
+                newCard?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+        });
+    });
+
+    clearNewBtn.addEventListener('click', () => {
+        const count = items.filter(i => i.isNew).length;
+        if (count === 0) { showNotification('新着項目はありません', 'info'); return; }
+        items.forEach(i => i.isNew = false);
+        scheduleRender();
+        showNotification(`${count}件を確認済みにしました`);
+    });
+
+    clearBtn.addEventListener('click', () => {
+        if (items.length === 0) return;
+        if (!confirm(`全${items.length}件を削除しますか？（予算設定は保持されます）`)) return;
+        items = [];
+        itemId = 0;
+        scheduleSave(); // 予算は保持したまま保存
+        scheduleRender();
+        showNotification('全項目をクリアしました');
+    });
+
+    exportBtn.addEventListener('click', showExportModal);
+
+    /* ─── エクスポートモーダル ─── */
+    function showExportModal() {
+        document.getElementById('exportModal')?.remove();
+        const totalItems  = items.length;
+        const totalMonths = new Set(items.map(i => { const p=i.date.split('/'); return p.length>=2?`${p[0]}/${parseInt(p[1])}`:null; }).filter(Boolean)).size;
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.id = 'exportModal';
+        overlay.innerHTML = `
+            <div class="modal-box budget-modal-box" role="dialog" aria-modal="true"
+                 style="border-color:rgba(96,165,250,0.4);max-width:480px;">
+                <div class="modal-icon">💾</div>
+                <div class="modal-title blue">データのエクスポート</div>
+                <div class="modal-desc">
+                    全${totalItems}件・${totalMonths}ヶ月分のデータを出力します。<br>
+                    用途に合わせて形式を選択してください。
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-main blue-btn" id="expMonthCsvBtn">
+                        <span>📅</span>
+                        <div class="modal-btn-content">
+                            <span>${escHtml(formatMonth(selectedMonth))}のみ（CSV）</span>
+                            <span class="modal-btn-desc">現在表示中の月の支出をCSV出力。Excelで開けます</span>
+                        </div>
+                    </button>
+                    <button class="modal-btn modal-btn-sub" id="expAllCsvBtn">
+                        <span>📋</span>
+                        <div class="modal-btn-content">
+                            <span>全期間・全データ（CSV）</span>
+                            <span class="modal-btn-desc">全月の支出＋予算＋収入＋口座を1ファイルに出力。Google Sheets等での分析向け</span>
+                        </div>
+                    </button>
+                    <button class="modal-btn modal-btn-sub" id="expJsonBtn"
+                        style="border-color:rgba(52,211,153,0.3);color:#6ee7b7;">
+                        <span>🗂️</span>
+                        <div class="modal-btn-content">
+                            <span>完全バックアップ（JSON）</span>
+                            <span class="modal-btn-desc">全設定・全データを完全復元できる形式で保存。データ移行・バックアップに最適</span>
+                        </div>
+                    </button>
+                    <button class="modal-btn modal-btn-cancel" id="expCancelBtn">キャンセル</button>
+                </div>
+            </div>`;
+        overlay.querySelector('#expMonthCsvBtn').addEventListener('click', () => { overlay.remove(); exportMonthCsv(); });
+        overlay.querySelector('#expAllCsvBtn').addEventListener('click',  () => { overlay.remove(); exportAllCsv(); });
+        overlay.querySelector('#expJsonBtn').addEventListener('click',    () => { overlay.remove(); exportFullJson(); });
+        overlay.querySelector('#expCancelBtn').addEventListener('click',  () => overlay.remove());
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
+
+    /* ─── ダウンロードヘルパー ─── */
+    function downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        Object.assign(document.createElement('a'), { href: url, download: filename }).click();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    /* ─── CSV用エスケープ ─── */
+    function csvCell(v) {
+        const s = v === null || v === undefined ? '' : String(v);
+        return s.includes(',') || s.includes('"') || s.includes('\n')
+            ? `"${s.replace(/"/g, '""')}"` : s;
+    }
+    function csvRow(...cells) { return cells.map(csvCell).join(','); }
+
+    /* ─── ① 現在の月のみ CSV（従来互換） ─── */
+    function exportMonthCsv() {
+        const monthItems = getMonthItems();
+        const s = calcSummary(monthItems);
+        const rows = [
+            csvRow('日付','項目名','総額（円）','タイプ','カテゴリ','決済カード','支払元口座','自己負担額','特別支出','回収済み'),
+        ];
+        monthItems
+            .slice().sort((a,b) => a.date.localeCompare(b.date))
+            .forEach(item => {
+                rows.push(csvRow(
+                    item.date,
+                    item.name,
+                    item.originalAmount,
+                    item.type === 'own' ? '自費' : item.type === 'fullAdvance' ? '全額立替' : '一部立替',
+                    item.category || '',
+                    item.card || DEFAULT_CARD,
+                    item.paymentSource || '',
+                    calcBurden(item),
+                    item.isSpecial ? '●' : '',
+                    item.type === 'fullAdvance' && item.collected ? '●' : ''
+                ));
+            });
+        rows.push('');
+        rows.push(csvRow('','','集計',''));
+        rows.push(csvRow('','総支出額（= 自分が払う額）', s.totalAmount, '円'));
+        rows.push(csvRow('','最終自己負担（生活費）',     s.finalBurden, '円'));
+        if (s.specialBurden > 0)
+            rows.push(csvRow('','特別支出（集計除外）', s.specialBurden, '円'));
+        rows.push(csvRow('','立替回収待ち',  s.toCollect,       '円'));
+        rows.push(csvRow('','回収済み',      s.collectedAmount, '円'));
+        rows.push(csvRow('','他者負担分',    s.othersPay,       '円'));
+        rows.push(csvRow('','全額立替合計',  s.fullAdvance,     '円'));
+
+        const monthStr = selectedMonth.replace('/', '-');
+        downloadBlob(
+            new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' }),
+            `支出分担_${monthStr}.csv`
+        );
+        showNotification(`${formatMonth(selectedMonth)}のCSVをダウンロードしました 💾`);
+    }
+
+    /* ─── ② 全期間・全データ CSV（複数セクション構成） ─── */
+    function exportAllCsv() {
+        const rows = [];
+        const sec  = title => { rows.push(''); rows.push(`## ${title}`); };
+
+        // すべての月を昇順で取得
+        const allMonths = [...new Set(
+            items.map(i => { const p=i.date.split('/'); return p.length>=2?`${p[0]}/${parseInt(p[1])}`:null; })
+                 .filter(Boolean)
+        )].sort();
+
+        // ─ 1. 支出項目（全期間）
+        sec('支出項目（全期間）');
+        rows.push(csvRow(
+            '日付','月','項目名','総額（円）','タイプ',
+            'カテゴリ','決済カード','支払元口座',
+            '自己負担額（円）','特別支出（集計除外）','回収済み','立替自費負担額（円）'
+        ));
+        [...items].sort((a,b) => a.date.localeCompare(b.date)).forEach(item => {
+            const p = item.date.split('/');
+            const month = p.length>=2 ? `${p[0]}/${parseInt(p[1])}` : '';
+            rows.push(csvRow(
+                item.date, month, item.name, item.originalAmount,
+                item.type === 'own' ? '自費' : item.type === 'fullAdvance' ? '全額立替' : '一部立替',
+                item.category || '',
+                item.card || DEFAULT_CARD,
+                item.paymentSource || '',
+                calcBurden(item),
+                item.isSpecial ? '●' : '',
+                item.type === 'fullAdvance' && item.collected ? '●' : '',
+                item.type === 'partialAdvance' ? item.amount : ''
+            ));
+        });
+
+        // ─ 2. 月別集計サマリー
+        sec('月別集計サマリー');
+        rows.push(csvRow(
+            '月','収入（円）','総支出額（円）',
+            '最終自己負担（円）','特別支出除外額（円）',
+            '立替回収待ち（円）','回収済み（円）','他者負担分（円）'
+        ));
+        allMonths.forEach(month => {
+            const mi = items.filter(i => { const p=i.date.split('/'); return p.length>=2&&`${p[0]}/${parseInt(p[1])}`===month; });
+            const s  = calcSummary(mi);
+            rows.push(csvRow(
+                month, getMonthIncome(month),
+                s.totalAmount, s.finalBurden, s.specialBurden,
+                s.toCollect, s.collectedAmount, s.othersPay
+            ));
+        });
+
+        // ─ 3. カテゴリ別予算（月別）
+        sec('カテゴリ別予算（月別）');
+        const budgetMonths = [...new Set([...Object.keys(budgets), ...allMonths])].sort();
+        const allCatsForBudget = [
+            ...FIXED_BUDGET_CATEGORIES,
+            ...userCategories.filter(c => !FIXED_BUDGET_CATEGORIES.includes(c))
+        ];
+        rows.push(csvRow('月', ...allCatsForBudget));
+        budgetMonths.forEach(month => {
+            const mb = budgets[month] || {};
+            rows.push(csvRow(month, ...allCatsForBudget.map(cat => mb[cat] ?? '')));
+        });
+
+        // ─ 4. 収入レコード
+        sec('収入レコード');
+        rows.push(csvRow('対象月','名前','金額（円）','ステータス','受取口座'));
+        [...incomeRecords].sort((a,b) => a.targetMonth.localeCompare(b.targetMonth)).forEach(r => {
+            rows.push(csvRow(r.targetMonth, r.name, r.amount, r.status === 'pending' ? '未受取' : '受取済', r.account));
+        });
+
+        // ─ 4b. 資金移動履歴
+        sec('資金移動履歴');
+        rows.push(csvRow('日付','移動元口座','移動先口座','金額（円）','メモ'));
+        [...transfers].sort((a,b) => a.date.localeCompare(b.date)).forEach(t => {
+            rows.push(csvRow(t.date, t.fromAccount, t.toAccount, t.amount, t.note || ''));
+        });
+
+        // ─ 5. 口座情報
+        sec('口座情報（初期残高）');
+        rows.push(csvRow('口座名','初期残高（円）'));
+        accounts.forEach(a => rows.push(csvRow(a.name, a.initial)));
+
+        // ─ 6. カード一覧
+        sec('決済カード一覧');
+        rows.push(csvRow('カード名','デフォルト'));
+        cards.forEach((c, i) => rows.push(csvRow(c, i === 0 ? '●' : '')));
+
+        // ─ 7. カテゴリ一覧
+        sec('カテゴリ一覧');
+        rows.push(csvRow('カテゴリ名','固定予算カテゴリ'));
+        userCategories.forEach(cat =>
+            rows.push(csvRow(cat, FIXED_BUDGET_CATEGORIES.includes(cat) ? '●' : ''))
+        );
+
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        downloadBlob(
+            new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' }),
+            `支出分担_全データ_${dateStr}.csv`
+        );
+        showNotification(`全${items.length}件・全データのCSVをダウンロードしました 💾`);
+    }
+
+    /* ─── ③ 完全バックアップ JSON ─── */
+    function exportFullJson() {
+        const today = new Date();
+        const payload = {
+            _meta: {
+                appName: '支出分担計算',
+                exportedAt: today.toISOString(),
+                exportedAtJST: `${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()} ${today.toLocaleTimeString('ja-JP')}`,
+                version: '3.0',
+                totalItems: items.length,
+            },
+            items,
+            itemId,
+            budgets,
+            incomes,
+            cards,
+            cardBudgets,
+            userCategories,
+            accounts,
+            incomeRecords,
+            incomeRecordId,
+            transfers,
+            transferId,
+        };
+        const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+        downloadBlob(
+            new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }),
+            `支出分担_バックアップ_${dateStr}.json`
+        );
+        showNotification(`完全バックアップ（JSON）をダウンロードしました 🗂️`);
+    }
+
+    /* ─── ソート・フィルタイベント ─── */
+    document.getElementById('sortSelect').addEventListener('change', e => {
+        sortMode = e.target.value;
+        scheduleRender();
+    });
+
+    document.getElementById('filterTabs').addEventListener('click', e => {
+        const tab = e.target.closest('.filter-tab');
+        if (!tab) return;
+        filterMode = tab.dataset.filter;
+        document.querySelectorAll('.filter-tab').forEach(t => t.classList.toggle('active', t === tab));
+        scheduleRender();
+    });
+
+    /* ─── コピーイベント ─── */
+    document.getElementById('copyBtn').addEventListener('click', () => {
+        const monthItems = getMonthItems();
+        const s = calcSummary(monthItems);
+        const today = new Date();
+        const dateStr = `${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()}`;
+        const uncollectedCount = monthItems.filter(i => i.type === 'fullAdvance' && !i.collected).length
+            + monthItems.filter(i => i.type === 'partialAdvance').length;
+        const text = [
+            `【支出分担まとめ ${formatMonth(selectedMonth)}】`,
+            `自分が払う額（総支出額）：¥${s.totalAmount.toLocaleString()}`,
+            '─────────────',
+            `✅ 最終自己負担：¥${s.finalBurden.toLocaleString()}`,
+            `🔄 立替回収待ち：¥${s.toCollect.toLocaleString()}（${uncollectedCount}件）`,
+            s.collectedAmount > 0 ? `💚 回収済み：¥${s.collectedAmount.toLocaleString()}` : null,
+            s.othersPay > 0 ? `👥 他者負担分（一部立替）：¥${s.othersPay.toLocaleString()}` : null,
+            '─────────────',
+            `（${dateStr} 現在）`
+        ].filter(Boolean).join('\n');
+        navigator.clipboard.writeText(text).then(() => showNotification('集計をコピーしました 📋'));
+    });
+
+    /* ─── イベントデリゲーション（クリック） ─── */
+    itemsContainer.addEventListener('click', e => {
+        // 回収済みトグル
+        const collectBtn = e.target.closest('.collect-toggle');
+        if (collectBtn) {
+            const card = collectBtn.closest('.item-card');
+            if (!card) return;
+            const item = items.find(i => i.id === +card.dataset.id);
+            if (!item) return;
+            item.collected = !item.collected;
+            scheduleRender();
+            return;
+        }
+        // 削除
+        if (e.target.classList.contains('btn-delete')) {
+            const card = e.target.closest('.item-card');
+            if (!card) return;
+            items = items.filter(i => i.id !== +card.dataset.id);
+            scheduleRender();
+            return;
+        }
+        // タイプ選択
+        if (e.target.classList.contains('type-btn')) {
+            const card = e.target.closest('.item-card');
+            if (!card) return;
+            const item = items.find(i => i.id === +card.dataset.id);
+            if (!item) return;
+            item.type = e.target.dataset.type;
+            if (item.type !== 'partialAdvance') item.amount = item.originalAmount;
+            scheduleRender();
+        }
+    });
+
+    /* ─── イベントデリゲーション（input） ─── */
+    itemsContainer.addEventListener('input', e => {
+        const card = e.target.closest('.item-card');
+        if (!card) return;
+        const id   = +card.dataset.id;
+        const item = items.find(i => i.id === id);
+        if (!item) return;
+
+        const n = e.target.name;
+        if (n === `orig_${id}`) {
+            item.originalAmount = Math.max(0, parseInt(e.target.value) || 0);
+            if (item.type !== 'partialAdvance') item.amount = item.originalAmount;
+            updateSummaryOnly();
+        } else if (n === `partial_${id}`) {
+            item.amount = Math.max(0, parseInt(e.target.value) || 0);
+            updateSummaryOnly();
+        } else if (n === `name_${id}`) {
+            item.name = e.target.value;
+        }
+    });
+
+    /* ─── イベントデリゲーション（change: カテゴリ・カード select） ─── */
+    itemsContainer.addEventListener('change', e => {
+        const itemCard = e.target.closest('.item-card');
+        if (!itemCard) return;
+        const item = items.find(i => i.id === +itemCard.dataset.id);
+        if (!item) return;
+
+        if (e.target.classList.contains('category-select')) {
+            item.category = e.target.value;
+            scheduleSave();
+            updateCategoryBudget(getMonthItems());
+        } else if (e.target.classList.contains('payment-card-select')) {
+            item.card = e.target.value;
+            scheduleSave();
+            updateCategoryBudget(getMonthItems());
+        } else if (e.target.classList.contains('payment-source-select')) {
+            item.paymentSource = e.target.value;
+            scheduleSave();
+            updateBalanceDOM(); // 支払元変更 → 残高即更新
+        } else if (e.target.classList.contains('special-toggle-cb')) {
+            item.isSpecial = e.target.checked;
+            scheduleSave();
+            scheduleRender(); // カードスタイルを即時反映
+        }
+    });
+
+    /* ─── 集計のみ差分更新（フォーカス維持） ─── */
+    function updateSummaryOnly() {
+        const monthItems = getMonthItems();
+        const s = calcSummary(monthItems);
+        updateSummaryDOM(s, monthItems);
+        scheduleSave();
+    }
+
+    function updateSummaryDOM(s, monthItems) {
+        const fmt = n => `¥${n.toLocaleString()}`;
+        document.getElementById('totalAmount').textContent     = fmt(s.totalAmount);
+        document.getElementById('myPayment').textContent       = fmt(s.myPayment);
+        document.getElementById('finalBurden').textContent     = fmt(s.finalBurden);
+        document.getElementById('toCollect').textContent       = fmt(s.toCollect);
+        document.getElementById('collectedAmount').textContent = fmt(s.collectedAmount);
+        document.getElementById('othersPay').textContent       = fmt(s.othersPay);
+
+        if (s.totalAmount > 0) {
+            document.getElementById('barOwn').style.width     = (s.ownExpense   / s.totalAmount * 100) + '%';
+            document.getElementById('barFull').style.width    = (s.fullAdvance  / s.totalAmount * 100) + '%';
+            document.getElementById('barPartial').style.width = (s.partialSelf  / s.totalAmount * 100) + '%';
+            document.getElementById('barOthers').style.width  = (s.partialOther / s.totalAmount * 100) + '%';
+        } else {
+            ['barOwn','barFull','barPartial','barOthers'].forEach(id => {
+                document.getElementById(id).style.width = '0%';
+            });
+        }
+
+        document.getElementById('flowEquation').innerHTML = s.totalAmount > 0
+            ? buildEquation(s)
+            : 'データを読み込むと内訳が表示されます';
+
+        // 各カードの負担チップを差分更新
+        itemsContainer.querySelectorAll('.item-card').forEach(card => {
+            const id   = +card.dataset.id;
+            const item = items.find(i => i.id === id);
+            if (!item) return;
+            const chip = card.querySelector('.burden-chip');
+            if (chip) chip.lastChild.textContent = `¥${calcBurden(item).toLocaleString()}`;
+        });
+
+        // カテゴリ予算進捗を更新
+        if (monthItems) updateCategoryBudget(monthItems);
+        // 口座残高を更新
+        updateBalanceDOM();
+        // 折りたたみ時のミニバー更新
+        if (typeof updateMiniBar === 'function') updateMiniBar(s);
+    }
+
+    /* ─── 内訳式生成 ─── */
+    function buildEquation(s) {
+        const collectedPart = s.collectedAmount > 0
+            ? ` ＋ 回収済み <span class="flow-eq-highlight">¥${s.collectedAmount.toLocaleString()}</span>` : '';
+        return `
+            <div>💳 自分が払う額 <span class="flow-eq-highlight">¥${s.myPayment.toLocaleString()}</span></div>
+            <div>　＝　✅ 最終自己負担 <span class="flow-eq-highlight">¥${s.finalBurden.toLocaleString()}</span>
+                　＋　🔄 立替回収待ち <span class="flow-eq-highlight">¥${s.toCollect.toLocaleString()}</span>${collectedPart}</div>`;
+    }
+
+    /* ─── 計算 ─── */
+    function calcBurden(item) {
+        if (item.type === 'own')         return item.originalAmount;
+        if (item.type === 'fullAdvance') return 0;
+        return item.amount;
+    }
+
+    // itemsToCalc を受け取ることで月フィルタ済みの配列にも対応
+    function calcSummary(itemsToCalc) {
+        if (!itemsToCalc) itemsToCalc = items;
+        let totalAmount = 0, ownExpense = 0, fullAdvance = 0, partialSelf = 0, partialOther = 0, toCollect = 0, collectedAmount = 0, otherCardDeduction = 0, specialBurden = 0;
+        itemsToCalc.forEach(item => {
+            totalAmount += item.originalAmount;
+            if (item.type === 'own') {
+                ownExpense += item.originalAmount;
+            } else if (item.type === 'fullAdvance') {
+                fullAdvance += item.originalAmount;
+                if (item.collected) collectedAmount += item.originalAmount;
+                else toCollect += item.originalAmount;
+            } else {
+                partialSelf  += item.amount;
+                const otherPart = item.originalAmount - item.amount;
+                partialOther += otherPart;
+                toCollect    += otherPart;
+            }
+            // 他カード引き落とし: 実際の自己負担分（calcBurden）を別集計
+            if (item.category === OTHER_CARD_CATEGORY) {
+                otherCardDeduction += calcBurden(item);
+            }
+            // 特別支出: 生活費集計から除外するための負担額を別途合算
+            if (item.isSpecial) {
+                specialBurden += calcBurden(item);
+            }
+        });
+        // 最終自己負担から特別支出を除外
+        const finalBurden     = ownExpense + partialSelf - specialBurden;
+        const lifestyleBurden = finalBurden - otherCardDeduction; // 他カード除いた生活費負担
+        const myPayment       = totalAmount;
+        const othersPay       = partialOther;
+        return { totalAmount, ownExpense, fullAdvance, partialSelf, partialOther, finalBurden, lifestyleBurden, otherCardDeduction, myPayment, toCollect, collectedAmount, othersPay, specialBurden };
+    }
+
+    /* ─── カテゴリ別予算進捗 (NEW) ─── */
+    function updateCategoryBudget(monthItems) {
+        const container = document.getElementById('categoryBudgetSection');
+        if (!container) return;
+
+        const monthBudgets = budgets[selectedMonth] || {};
+
+        // カテゴリ別の自己負担額を集計（特別支出は除外）
+        const spending = {};
+        userCategories.forEach(cat => spending[cat] = 0);
+        let unclassifiedSpending = 0;
+        monthItems.forEach(item => {
+            if (item.isSpecial) return; // 特別支出は生活費集計から除外
+            const cat = item.category;
+            if (!cat || (cat !== OTHER_CARD_CATEGORY && !userCategories.includes(cat))) {
+                // 未設定 or 旧カテゴリ（OTHER_CARD_CATEGORY除く）→ 未分類に集計
+                unclassifiedSpending += calcBurden(item);
+            } else if (cat && spending.hasOwnProperty(cat)) {
+                spending[cat] += calcBurden(item);
+            }
+        });
+
+        const income        = getMonthIncome(selectedMonth);
+        const budgetTotal   = userCategories.reduce((sum, cat) => sum + (monthBudgets[cat] || 0), 0);
+        // 他カード引き落とし・立替情報を含む完全な集計を取得
+        const s_sum              = calcSummary(monthItems);
+        const otherCardDeduction = s_sum.otherCardDeduction;
+        const lifestyleBurden    = s_sum.lifestyleBurden;
+        const finalBurdenTotal   = s_sum.finalBurden;
+        const toCollectTotal     = s_sum.toCollect;
+        const collectedAmtTotal  = s_sum.collectedAmount;
+
+        // --- 貯金サマリーカード ---
+        let savingsHtml = '';
+        if (income > 0) {
+            // 現時点の手元残り = 収入 - 全自己負担 - 未回収立替金
+            const currentEstimate = income - finalBurdenTotal - toCollectTotal;
+            // 立替が全て回収された後の最終貯金額
+            const finalSavings    = income - finalBurdenTotal;
+            // 生活費予算ベースの貯金予定（他カード引き落とし除く）
+            const plannedSavings  = income - budgetTotal;
+
+            const spendPct  = Math.min(100, Math.round(finalBurdenTotal / income * 100));
+            const budgetPct = budgetTotal > 0 ? Math.min(100, Math.round(budgetTotal / income * 100)) : 0;
+            const barColor  = spendPct >= 100 ? '#dc2626' : spendPct >= 90 ? '#ef4444' : spendPct >= 70 ? '#f59e0b' : '#10b981';
+
+            const fmt = n => `¥${Math.abs(n).toLocaleString()}`;
+            const signedFmt = (n, posColor = '#34d399', negColor = '#f87171') =>
+                n >= 0
+                    ? `<span style="color:${posColor};font-weight:800;">${fmt(n)}</span>`
+                    : `<span style="color:${negColor};font-weight:800;">−${fmt(n)} <span style="font-size:10px;opacity:0.8;">赤字</span></span>`;
+
+            const markerStyle = budgetPct > 0
+                ? `<div class="savings-budget-marker" style="left:${budgetPct}%;" title="生活費予算合計"></div>`
+                : '';
+
+            // 収支計算フォーミュラを組み立て
+            const estColor   = currentEstimate >= 0 ? '#34d399' : '#f87171';
+            const finalColor = finalSavings >= 0 ? '#60a5fa' : '#f87171';
+
+            let formulaRows = `
+                <div class="sf-row">
+                    <span class="sf-label">💴 収入</span>
+                    <span class="sf-val sf-income-val">${fmt(income)}</span>
+                </div>
+                <div class="sf-row">
+                    <span class="sf-label"> − 生活費等の自己負担</span>
+                    <span class="sf-val sf-minus-val">${fmt(lifestyleBurden)}</span>
+                </div>`;
+
+            if (s_sum.specialBurden > 0) {
+                formulaRows += `
+                <div class="sf-note-row">
+                    <span class="sf-note">※ 特別支出（🌟集計除外）¥${s_sum.specialBurden.toLocaleString()} は自己負担から除外済み</span>
+                </div>`;
+            }
+
+            if (otherCardDeduction > 0) {
+                formulaRows += `
+                <div class="sf-row">
+                    <span class="sf-label" style="color:#fb923c;"> − 他カード引き落とし</span>
+                    <span class="sf-val sf-othercard-val">${fmt(otherCardDeduction)}</span>
+                </div>`;
+            }
+
+            if (toCollectTotal > 0) {
+                formulaRows += `
+                <div class="sf-row">
+                    <span class="sf-label"> − 立替回収待ち（現時点）</span>
+                    <span class="sf-val sf-warn-val">${fmt(toCollectTotal)}</span>
+                </div>`;
+            }
+
+            if (collectedAmtTotal > 0) {
+                formulaRows += `
+                <div class="sf-note-row">
+                    <span class="sf-note">※ 回収済み立替 ¥${collectedAmtTotal.toLocaleString()} は上記計算に含まれています</span>
+                </div>`;
+            }
+
+            const estSign = currentEstimate < 0 ? '−' : '';
+            const estSuffix = currentEstimate < 0 ? ' <span style="font-size:10px;">赤字</span>' : '';
+            formulaRows += `
+                <div class="sf-divider"></div>
+                <div class="sf-row">
+                    <span class="sf-result-label">＝ 現時点の手元残り</span>
+                    <span class="sf-result-val" style="color:${estColor};">${estSign}${fmt(currentEstimate)}${estSuffix}</span>
+                </div>`;
+
+            if (toCollectTotal > 0) {
+                const fsSign = finalSavings < 0 ? '−' : '';
+                formulaRows += `
+                <div class="sf-row" style="margin-top:3px;">
+                    <span class="sf-final-label">（立替全回収後: <span style="color:${finalColor};font-weight:700;">${fsSign}${fmt(finalSavings)}</span>）</span>
+                </div>`;
+            }
+
+            savingsHtml = `
+            <div class="savings-card">
+                <div class="savings-income-row">
+                    <span class="savings-label-text">💴 収入</span>
+                    <span class="savings-income-amt">${fmt(income)}</span>
+                </div>
+                <div class="savings-bar-track">
+                    <div class="savings-bar-fill" style="width:${spendPct}%;background:${barColor};"></div>
+                    ${markerStyle}
+                </div>
+                <div class="savings-bar-legend">
+                    <span style="color:${barColor};font-size:10px;font-weight:700;">支出 ${spendPct}%</span>
+                    ${budgetPct > 0 ? `<span style="color:#a78bfa;font-size:10px;">▲ 生活費予算 ${budgetPct}%</span>` : ''}
+                    <span style="color:#64748b;font-size:10px;">残 ${100 - spendPct}%</span>
+                </div>
+                <div class="savings-formula">
+                    <div class="sf-title">📊 収支計算</div>
+                    ${formulaRows}
+                </div>
+                <div class="savings-stats-grid" style="margin-top:8px;">
+                    <div class="savings-stat-box">
+                        <div class="savings-stat-label">📋 生活費予算合計</div>
+                        <div class="savings-stat-val neutral">${budgetTotal > 0 ? fmt(budgetTotal) : '―'}</div>
+                    </div>
+                    <div class="savings-stat-box">
+                        <div class="savings-stat-label">🧾 生活費支出実績</div>
+                        <div class="savings-stat-val" style="color:#93c5fd;">${fmt(lifestyleBurden)}</div>
+                    </div>
+                    ${budgetTotal > 0 ? `
+                    <div class="savings-stat-box highlight-green" style="grid-column:1/-1;">
+                        <div class="savings-stat-label">💰 予算ベース貯金予定（生活費のみ・他カード除く）</div>
+                        <div class="savings-stat-val">${signedFmt(plannedSavings)}</div>
+                    </div>` : ''}
+                </div>
+            </div>`;
+        }
+
+        // FIXED_BUDGET_CATEGORIES は常に表示するため、hasAnyData チェックは不要
+        // （固定カテゴリのデフォルト予算が常に存在するため）
+
+        // 固定4カテゴリを先頭に、それ以外の userCategories を後ろに並べる
+        const allCatsToShow = [
+            ...FIXED_BUDGET_CATEGORIES,
+            ...userCategories.filter(cat => !FIXED_BUDGET_CATEGORIES.includes(cat))
+        ];
+
+        const rows = allCatsToShow.map(cat => {
+            const spent   = spending[cat] || 0;
+            const isFixed = FIXED_BUDGET_CATEGORIES.includes(cat);
+            // 固定カテゴリは未設定時もデフォルト値を使用
+            const budget  = monthBudgets[cat] !== undefined
+                ? monthBudgets[cat]
+                : (isFixed ? FIXED_BUDGET_DEFAULTS[cat] : 0);
+            // 固定カテゴリは常に表示; それ以外はデータがある場合のみ
+            if (!isFixed && spent === 0 && budget === 0) return '';
+
+            const pct      = budget > 0 ? Math.min(100, Math.round(spent / budget * 100)) : 0;
+            const isOver   = budget > 0 && spent > budget;
+            const remaining = budget > 0 ? budget - spent : null;
+
+            // 進捗率に応じた色: 緑→黄→橙→赤
+            let barColor;
+            if (!budget)        barColor = '#3b82f6';
+            else if (pct < 70)  barColor = '#10b981';
+            else if (pct < 90)  barColor = '#f59e0b';
+            else if (pct < 100) barColor = '#ef4444';
+            else                barColor = '#dc2626';
+
+            const pctText    = budget > 0 ? `${pct}%` : '';
+            const remainText = budget > 0
+                ? (isOver
+                    ? `<span style="color:#f87171;font-weight:700;">超過 ¥${(spent-budget).toLocaleString()}</span>`
+                    : `<span style="color:#6ee7b7;">残 ¥${remaining.toLocaleString()}</span>`)
+                : '';
+            const amountText = budget > 0
+                ? `¥${spent.toLocaleString()} / ¥${budget.toLocaleString()}`
+                : `¥${spent.toLocaleString()}`;
+
+            return `<div class="cat-budget-row">
+                <div class="cat-budget-header">
+                    <span class="cat-name">${escHtml(cat)}</span>
+                    <span class="cat-amount">${amountText}</span>
+                </div>
+                ${budget > 0 ? `
+                <div class="cat-progress-bar">
+                    <div class="cat-progress-fill" style="width:${pct}%;background:${barColor};"></div>
+                </div>
+                <div class="cat-budget-meta">
+                    <span class="cat-pct" style="color:${isOver ? '#f87171' : '#94a3b8'};">${pctText}</span>
+                    ${remainText}
+                </div>` : ''}
+            </div>`;
+        }).filter(Boolean).join('');
+
+        // 未分類行: カテゴリ未設定または旧カテゴリの支出を可視化
+        const unclassifiedRow = unclassifiedSpending > 0 ? `
+        <div class="cat-budget-row unclassified-row">
+            <div class="cat-budget-header">
+                <span class="cat-name" style="color:#fcd34d;">⚠️ 未分類（または旧カテゴリ）</span>
+                <span class="cat-amount" style="color:#fcd34d;">¥${unclassifiedSpending.toLocaleString()}</span>
+            </div>
+            <div style="font-size:10px;color:#64748b;margin-top:2px;">
+                カテゴリ未設定または既存カテゴリに属さない支出の合計。項目にカテゴリを設定してください。
+            </div>
+        </div>` : '';
+
+        const catSection = (rows || unclassifiedRow)
+            ? `<div class="cat-list-section">${rows}${unclassifiedRow}</div>`
+            : '';
+
+        // ── カード別内訳 ──
+        // 二重計上防止: カテゴリ集計と同一 items を別軸（カード軸）で集計するビュー。
+        // 合計は actualBurdenTotal と一致し、カテゴリ合計とは足し合わせない。
+        const monthCardBudgets = cardBudgets[selectedMonth] || {};
+        const cardSpending = {};
+        cards.forEach(c => cardSpending[c] = 0);
+        monthItems.forEach(item => {
+            const c = item.card || DEFAULT_CARD;
+            if (cardSpending.hasOwnProperty(c)) {
+                cardSpending[c] += calcBurden(item);
+            } else {
+                // cards リストに存在しないカード（削除済み）は DEFAULT_CARD に集計
+                cardSpending[DEFAULT_CARD] = (cardSpending[DEFAULT_CARD] || 0) + calcBurden(item);
+            }
+        });
+
+        const cardRows = cards.map(c => {
+            const spent  = cardSpending[c] || 0;
+            const budget = monthCardBudgets[c] || 0;
+            if (spent === 0 && budget === 0) return '';
+
+            const pct      = budget > 0 ? Math.min(100, Math.round(spent / budget * 100)) : 0;
+            const isOver   = budget > 0 && spent > budget;
+            const remaining = budget > 0 ? budget - spent : null;
+
+            let barColor;
+            if (!budget)         barColor = '#7c3aed';
+            else if (pct < 70)   barColor = '#10b981';
+            else if (pct < 90)   barColor = '#f59e0b';
+            else if (pct < 100)  barColor = '#ef4444';
+            else                 barColor = '#dc2626';
+
+            const amountText = budget > 0
+                ? `¥${spent.toLocaleString()} / ¥${budget.toLocaleString()}`
+                : `¥${spent.toLocaleString()}`;
+            const remainText = budget > 0
+                ? (isOver
+                    ? `<span style="color:#f87171;font-weight:700;">超過 ¥${(spent-budget).toLocaleString()}</span>`
+                    : `<span style="color:#6ee7b7;">残 ¥${remaining.toLocaleString()}</span>`)
+                : '';
+
+            return `<div class="cat-budget-row">
+                <div class="cat-budget-header">
+                    <span class="cat-name" style="color:#c4b5fd;">${escHtml(c)}</span>
+                    <span class="cat-amount">${amountText}</span>
+                </div>
+                ${budget > 0 ? `
+                <div class="cat-progress-bar" style="background:rgba(167,139,250,0.1);">
+                    <div class="cat-progress-fill" style="width:${pct}%;background:${barColor};"></div>
+                </div>
+                <div class="cat-budget-meta">
+                    <span class="cat-pct" style="color:${isOver ? '#f87171' : '#94a3b8'};">${pct}%</span>
+                    ${remainText}
+                </div>` : ''}
+            </div>`;
+        }).filter(Boolean).join('');
+
+        const cardSection = cardRows ? `
+            <div class="card-breakdown-section">
+                <div class="card-breakdown-heading">💳 カード別内訳</div>
+                ${cardRows}
+                <div class="card-breakdown-note">
+                    ※ カテゴリ別・カード別はいずれも同一の支出を別軸で集計したものです。合計額は重複しません。
+                </div>
+            </div>` : '';
+
+        // 固定カテゴリが常に存在するためプレースホルダーは不要
+        const placeholder = '';
+
+        container.innerHTML = savingsHtml + catSection + cardSection + placeholder;
+        // 折りたたみ時の max-height を再計算（動的コンテンツ追加後）
+        const coll = document.getElementById('summaryCollapsible');
+        if (coll && !document.getElementById('summarySection')?.classList.contains('collapsed')) {
+            coll.style.maxHeight = coll.scrollHeight + 'px';
+        }
+    }
+
+    /* ─── カテゴリ select HTML生成 ─── */
+    function buildCategorySelect(item) {
+        const opts = userCategories.map(cat =>
+            `<option value="${escAttr(cat)}" ${item.category === cat ? 'selected' : ''}>${escHtml(cat)}</option>`
+        ).join('');
+        const isOtherCard = item.category === OTHER_CARD_CATEGORY;
+        return `
+        <div class="category-row">
+            <label>カテゴリ</label>
+            <select class="category-select" name="cat_${item.id}">
+                <option value="" ${!item.category ? 'selected' : ''}>未設定</option>
+                ${opts}
+                <optgroup label="─ 特殊区分（予算除外）">
+                    <option value="${escAttr(OTHER_CARD_CATEGORY)}" ${isOtherCard ? 'selected' : ''}>🟠 ${escHtml(OTHER_CARD_CATEGORY)}</option>
+                </optgroup>
+            </select>
+        </div>`;
+    }
+
+    /* ─── 決済カード select HTML生成 ─── */
+    function buildCardSelect(item) {
+        const opts = cards.map(c =>
+            `<option value="${escAttr(c)}" ${item.card === c ? 'selected' : ''}>${escHtml(c)}</option>`
+        ).join('');
+        return `
+        <div class="card-row">
+            <label>決済カード</label>
+            <select class="payment-card-select" name="pcard_${item.id}">
+                ${opts}
+            </select>
+        </div>`;
+    }
+
+    /* ─── 支払元口座 select HTML生成 ─── */
+    function buildPaymentSourceSelect(item) {
+        // 実口座（CC・未収入金以外）と CC 仮想口座を分けて表示
+        // ※未収入金は支払元として使用不可（プラス仮想口座のため除外）
+        const realOpts = accounts
+            .filter(a => a.name !== PAYMENT_SOURCE_CREDIT && a.name !== ACCRUED_INCOME_ACCOUNT)
+            .map(a => `<option value="${escAttr(a.name)}" ${item.paymentSource === a.name ? 'selected' : ''}>${escHtml(a.name)}</option>`)
+            .join('');
+        const ccSel = item.paymentSource === PAYMENT_SOURCE_CREDIT ? 'selected' : '';
+        return `
+        <div class="card-row">
+            <label>支払元口座</label>
+            <select class="payment-source-select" name="psrc_${item.id}">
+                <option value="" ${!item.paymentSource ? 'selected' : ''}>未設定</option>
+                <optgroup label="── 実口座">
+                    ${realOpts}
+                </optgroup>
+                <optgroup label="── クレジットカード（後払い負債）">
+                    <option value="${escAttr(PAYMENT_SOURCE_CREDIT)}" ${ccSel} style="color:#fb923c;">${escHtml(PAYMENT_SOURCE_CREDIT)}</option>
+                </optgroup>
+            </select>
+        </div>`;
+    }
+
+    /* ─── 口座残高計算（全期間の全トランザクションを集計）─── */
+    function calcBalances() {
+        const bal = {};
+        accounts.forEach(a => { bal[a.name] = a.initial; });
+
+        // incomeRecords を反映:
+        //   pending  → 未収入金（予定給与等）口座にプール
+        //   received → 指定口座に加算
+        incomeRecords.forEach(r => {
+            if (r.status === 'received') {
+                if (bal.hasOwnProperty(r.account)) bal[r.account] += r.amount;
+            } else {
+                if (bal.hasOwnProperty(ACCRUED_INCOME_ACCOUNT)) bal[ACCRUED_INCOME_ACCOUNT] += r.amount;
+            }
+        });
+
+        // 資金移動: fromAccount を減算 → toAccount を加算（純資産合計への影響ゼロ）
+        transfers.forEach(t => {
+            if (bal.hasOwnProperty(t.fromAccount)) bal[t.fromAccount] -= t.amount;
+            if (bal.hasOwnProperty(t.toAccount))   bal[t.toAccount]   += t.amount;
+        });
+
+        // 支出を paymentSource の口座から減算
+        // ・実口座（四国銀行等）: 即時残高が減る
+        // ・CC仮想口座: initial:0 からマイナスになり、クレカ未払い負債額を示す
+        const accNames = new Set(accounts.map(a => a.name));
+        items.forEach(item => {
+            if (item.paymentSource && accNames.has(item.paymentSource)) {
+                bal[item.paymentSource] -= item.originalAmount;
+            }
+        });
+
+        const total = Object.values(bal).reduce((s, v) => s + v, 0);
+        return { accounts: bal, total };
+    }
+
+    /* ─── 口座残高 DOM 更新 ─── */
+    function updateBalanceDOM() {
+        const container = document.getElementById('balanceSection');
+        if (!container) return;
+        const { accounts: bal, total } = calcBalances();
+        const fmt = n => {
+            const sign = n < 0 ? '−' : '';
+            return `${sign}¥${Math.abs(n).toLocaleString()}`;
+        };
+        // 3区分に分離して表示: 実口座 / 未収入金（プラス仮想）/ CC（マイナス仮想）
+        const realAccounts    = accounts.filter(a => a.name !== PAYMENT_SOURCE_CREDIT && a.name !== ACCRUED_INCOME_ACCOUNT);
+        const accruedAccount  = accounts.find(a => a.name === ACCRUED_INCOME_ACCOUNT);
+        const ccAccount       = accounts.find(a => a.name === PAYMENT_SOURCE_CREDIT);
+
+        const realRows = realAccounts.map(a => {
+            const v = bal[a.name] ?? a.initial;
+            const color = v < 0 ? '#f87171' : v < 1000 ? '#fcd34d' : '#6ee7b7';
+            return `<div class="balance-row">
+                <span class="balance-acc-name">${escHtml(a.name)}</span>
+                <span class="balance-acc-val" style="color:${color};">${fmt(v)}</span>
+            </div>`;
+        }).join('');
+
+        // 未収入金: 青みがかった色で「未来の資産」として表示
+        const accruedRow = accruedAccount ? (() => {
+            const v = bal[accruedAccount.name] ?? 0;
+            const color = v > 0 ? '#60a5fa' : '#475569';
+            return `<div class="balance-row" style="border-top:1px solid rgba(96,165,250,0.18);margin-top:4px;padding-top:6px;">
+                <span class="balance-acc-name" style="color:#93c5fd;">⏳ ${escHtml(accruedAccount.name)}</span>
+                <span class="balance-acc-val" style="color:${color};">${fmt(v)}</span>
+            </div>`;
+        })() : '';
+
+        // CC 負債: オレンジ系で「マイナス負債」として表示
+        const ccRow = ccAccount ? (() => {
+            const v = bal[ccAccount.name] ?? 0;
+            return `<div class="balance-row" style="border-top:1px solid rgba(251,146,60,0.2);margin-top:4px;padding-top:6px;">
+                <span class="balance-acc-name" style="color:#fb923c;">💳 ${escHtml(ccAccount.name)}</span>
+                <span class="balance-acc-val" style="color:#fb923c;">${fmt(v)}</span>
+            </div>`;
+        })() : '';
+        const totalColor = total < 0 ? '#f87171' : '#34d399';
+        container.innerHTML = `
+        <div class="balance-panel">
+            <div class="balance-header">
+                <span class="balance-title">🏦 口座残高</span>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <button class="btn-income-entry" id="incomeManageBtn">💴 収入を管理</button>
+                    <button class="btn-transfer" id="transferBtn">🔄 資金移動</button>
+                </div>
+            </div>
+            ${realRows}
+            ${accruedRow}
+            ${ccRow}
+            <div class="balance-total-row">
+                <span class="balance-total-label">純資産（実口座＋未収入 − クレカ負債）</span>
+                <span class="balance-total-val" style="color:${totalColor};">${fmt(total)}</span>
+            </div>
+        </div>`;
+        document.getElementById('incomeManageBtn')?.addEventListener('click', showIncomeManageModal);
+        document.getElementById('transferBtn')?.addEventListener('click', showTransferModal);
+    }
+
+    /* ─── 収入管理モーダル ─── */
+    function showIncomeManageModal() {
+        document.getElementById('incomeManageModal')?.remove();
+
+        const renderRecordList = (overlay) => {
+            const listEl = overlay.querySelector('#incRecordList');
+            const sorted = [...incomeRecords].sort((a, b) =>
+                b.targetMonth.localeCompare(a.targetMonth) || b.id - a.id
+            );
+            if (sorted.length === 0) {
+                listEl.innerHTML = '<div style="padding:14px;text-align:center;font-size:12px;color:#475569;">収入記録はまだありません</div>';
+                return;
+            }
+            listEl.innerHTML = sorted.map(r => `
+                <div class="income-record-row" data-rid="${r.id}">
+                    <span class="ir-month">${escHtml(r.targetMonth)}</span>
+                    <span class="ir-name">${escHtml(r.name)}</span>
+                    <span class="ir-amt">¥${r.amount.toLocaleString()}</span>
+                    <span class="ir-badge ${r.status}">${r.status === 'pending' ? '⏳ 未受取' : '✓ 受取済'}</span>
+                    <button class="ir-toggle" data-rid="${r.id}">
+                        ${r.status === 'pending' ? '受取済↑' : '未受取↓'}
+                    </button>
+                    <button class="ir-del" data-rid="${r.id}" title="削除">✕</button>
+                </div>`).join('');
+        };
+
+        // 受取口座セレクト（ACCRUED_INCOME_ACCOUNT は除外）
+        const accOpts = accounts
+            .filter(a => a.name !== ACCRUED_INCOME_ACCOUNT)
+            .map(a => `<option value="${escAttr(a.name)}" ${a.name === '四国銀行' ? 'selected' : ''}>${escHtml(a.name)}</option>`)
+            .join('');
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.id = 'incomeManageModal';
+        overlay.innerHTML = `
+            <div class="modal-box budget-modal-box" role="dialog" aria-modal="true"
+                 style="border-color:rgba(52,211,153,0.4);max-width:520px;">
+                <div class="modal-icon">💴</div>
+                <div class="modal-title blue" style="color:#34d399;">収入を管理</div>
+                <div class="modal-desc">
+                    「⏳ 未受取」は⏳未収入金口座に積まれ純資産に加算されます。<br>
+                    ステータスを「✓ 受取済」に切り替えると指定口座の残高に反映されます。
+                </div>
+
+                <!-- 追加フォーム -->
+                <div style="background:rgba(0,0,0,0.2);border:1px solid rgba(52,211,153,0.15);border-radius:10px;padding:12px 14px;margin-bottom:14px;">
+                    <div style="font-size:11px;font-weight:700;color:#6ee7b7;margin-bottom:10px;">＋ 新しい収入を追加</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+                        <div>
+                            <div style="font-size:10px;color:#64748b;margin-bottom:3px;">名前・メモ</div>
+                            <input id="irNameInput" type="text" placeholder="給与・ボーナス等"
+                                style="width:100%;background:rgba(148,163,184,0.06);border:1px solid rgba(52,211,153,0.3);
+                                color:#e2e8f0;padding:7px 9px;border-radius:7px;font-size:12px;">
+                        </div>
+                        <div>
+                            <div style="font-size:10px;color:#64748b;margin-bottom:3px;">金額（円）</div>
+                            <input id="irAmtInput" type="number" placeholder="200000" inputmode="numeric"
+                                style="width:100%;background:rgba(148,163,184,0.06);border:1px solid rgba(52,211,153,0.3);
+                                color:#e2e8f0;padding:7px 9px;border-radius:7px;font-size:12px;font-weight:700;">
+                        </div>
+                        <div>
+                            <div style="font-size:10px;color:#64748b;margin-bottom:3px;">対象月 (YYYY/M)</div>
+                            <input id="irMonthInput" type="text" value="${escAttr(selectedMonth)}"
+                                placeholder="${escAttr(selectedMonth)}"
+                                style="width:100%;background:rgba(148,163,184,0.06);border:1px solid rgba(52,211,153,0.3);
+                                color:#e2e8f0;padding:7px 9px;border-radius:7px;font-size:12px;">
+                        </div>
+                        <div>
+                            <div style="font-size:10px;color:#64748b;margin-bottom:3px;">受取口座</div>
+                            <select id="irAccSelect"
+                                style="width:100%;background:rgba(10,20,50,0.6);border:1px solid rgba(52,211,153,0.3);
+                                color:#e2e8f0;padding:7px 9px;border-radius:7px;font-size:12px;-webkit-appearance:none;">
+                                ${accOpts}
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                        <div style="font-size:10px;color:#64748b;">ステータス:</div>
+                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#fbbf24;">
+                            <input type="radio" name="irStatus" value="pending" checked style="accent-color:#fbbf24;"> ⏳ 未受取
+                        </label>
+                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:11px;color:#34d399;">
+                            <input type="radio" name="irStatus" value="received" style="accent-color:#34d399;"> ✓ 受取済
+                        </label>
+                        <button id="irAddBtn" style="margin-left:auto;background:linear-gradient(135deg,#059669,#047857);
+                            color:#fff;border:none;border-radius:7px;padding:7px 16px;font-size:12px;font-weight:700;
+                            cursor:pointer;-webkit-tap-highlight-color:transparent;">追加</button>
+                    </div>
+                </div>
+
+                <!-- 収入一覧 -->
+                <div id="incListLabel" style="font-size:11px;color:#64748b;margin-bottom:6px;">収入一覧（${incomeRecords.length}件）</div>
+                <div class="income-record-list" id="incRecordList"></div>
+
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-cancel" id="incManageCloseBtn"
+                        style="background:rgba(100,116,155,0.15);color:#6ee7b7;
+                               border:1px solid rgba(52,211,153,0.25);border-radius:10px;padding:12px;font-weight:700;">
+                        閉じる
+                    </button>
+                </div>
+            </div>`;
+
+        renderRecordList(overlay);
+
+        // 追加ボタン
+        overlay.querySelector('#irAddBtn').addEventListener('click', () => {
+            const name   = overlay.querySelector('#irNameInput').value.trim() || '収入';
+            const amt    = parseInt(overlay.querySelector('#irAmtInput').value) || 0;
+            const month  = overlay.querySelector('#irMonthInput').value.trim() || selectedMonth;
+            const acc    = overlay.querySelector('#irAccSelect').value;
+            const status = overlay.querySelector('input[name="irStatus"]:checked').value;
+            if (amt <= 0) { showNotification('金額を入力してください', 'info'); return; }
+            incomeRecords.push({ id: incomeRecordId++, name, amount: amt, targetMonth: month, status, account: acc });
+            scheduleSave();
+            updateBalanceDOM();
+            updateCategoryBudget(getMonthItems());
+            overlay.querySelector('#irAmtInput').value = '';
+            overlay.querySelector('#irNameInput').value = '';
+            overlay.querySelector('#incListLabel').textContent = `収入一覧（${incomeRecords.length}件）`;
+            renderRecordList(overlay);
+            showNotification(`¥${amt.toLocaleString()} を追加しました 💴`);
+        });
+
+        // リスト内のイベント（デリゲーション）
+        overlay.querySelector('#incRecordList').addEventListener('click', e => {
+            const rid = e.target.dataset.rid !== undefined ? +e.target.dataset.rid : null;
+            if (rid === null || isNaN(rid)) return;
+
+            if (e.target.classList.contains('ir-toggle')) {
+                const rec = incomeRecords.find(r => r.id === rid);
+                if (!rec) return;
+                rec.status = rec.status === 'pending' ? 'received' : 'pending';
+                scheduleSave();
+                updateBalanceDOM();
+                updateCategoryBudget(getMonthItems());
+                renderRecordList(overlay);
+                showNotification(rec.status === 'received' ? '✓ 受取済にしました' : '⏳ 未受取に戻しました');
+                return;
+            }
+            if (e.target.classList.contains('ir-del')) {
+                const rec = incomeRecords.find(r => r.id === rid);
+                if (!rec) return;
+                if (!confirm(`「${rec.name}」¥${rec.amount.toLocaleString()} を削除しますか？`)) return;
+                incomeRecords = incomeRecords.filter(r => r.id !== rid);
+                scheduleSave();
+                updateBalanceDOM();
+                updateCategoryBudget(getMonthItems());
+                overlay.querySelector('#incListLabel').textContent = `収入一覧（${incomeRecords.length}件）`;
+                renderRecordList(overlay);
+            }
+        });
+
+        overlay.querySelector('#incManageCloseBtn').addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
+
+    /* ─── 資金移動モーダル ─── */
+    function showTransferModal() {
+        document.getElementById('transferModal')?.remove();
+        const today = new Date();
+        const defaultDate = `${today.getFullYear()}/${today.getMonth()+1}/${today.getDate()}`;
+
+        // ACCRUED_INCOME_ACCOUNT は除外（pendingとreceived間の異動はincomeRecordのステータス変更で行う）
+        const accOpts = accounts
+            .filter(a => a.name !== ACCRUED_INCOME_ACCOUNT)
+            .map(a => `<option value="${escAttr(a.name)}">${escHtml(a.name)}</option>`)
+            .join('');
+
+        const renderTransferList = (overlay) => {
+            const listEl = overlay.querySelector('#transferListEl');
+            if (transfers.length === 0) {
+                listEl.innerHTML = '<div style="padding:12px;text-align:center;font-size:12px;color:#475569;">資金移動の記録はありません</div>';
+                return;
+            }
+            const sorted = [...transfers].sort((a, b) => b.date.localeCompare(a.date));
+            listEl.innerHTML = sorted.map(t => `
+                <div class="transfer-row" data-tid="${t.id}">
+                    <span class="tr-date">${escHtml(t.date)}</span>
+                    <span class="tr-from">${escHtml(t.fromAccount)}</span>
+                    <span class="tr-arr">→</span>
+                    <span class="tr-to">${escHtml(t.toAccount)}</span>
+                    <span class="tr-amt">¥${t.amount.toLocaleString()}</span>
+                    ${t.note ? `<span style="color:#64748b;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60px;" title="${escAttr(t.note)}">${escHtml(t.note)}</span>` : ''}
+                    <button class="tr-del" data-tid="${t.id}" title="削除">✕</button>
+                </div>`).join('');
+        };
+
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.id = 'transferModal';
+        overlay.innerHTML = `
+            <div class="modal-box budget-modal-box" role="dialog" aria-modal="true"
+                 style="border-color:rgba(167,139,250,0.4);max-width:480px;">
+                <div class="modal-icon">🔄</div>
+                <div class="modal-title blue" style="color:#c4b5fd;">口座間 資金移動</div>
+                <div class="modal-desc">
+                    口座間の移動を記録します。純資産の合計には影響しません。<br>
+                    <span style="font-size:11px;color:#64748b;">（未収入金⇔実口座の移動は収入管理の「ステータス切替」で行えます）</span>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+                    <div>
+                        <div style="font-size:10px;color:#64748b;margin-bottom:3px;">日付</div>
+                        <input id="trDateInput" type="text" value="${escAttr(defaultDate)}"
+                            style="width:100%;background:rgba(148,163,184,0.06);border:1px solid rgba(167,139,250,0.3);
+                            color:#e2e8f0;padding:7px 9px;border-radius:7px;font-size:12px;">
+                    </div>
+                    <div>
+                        <div style="font-size:10px;color:#64748b;margin-bottom:3px;">金額（円）</div>
+                        <input id="trAmtInput" type="number" placeholder="10000" inputmode="numeric"
+                            style="width:100%;background:rgba(148,163,184,0.06);border:1px solid rgba(167,139,250,0.3);
+                            color:#e2e8f0;padding:7px 9px;border-radius:7px;font-size:12px;font-weight:700;">
+                    </div>
+                    <div>
+                        <div style="font-size:10px;color:#fb923c;margin-bottom:3px;">移動元口座</div>
+                        <select id="trFromSelect"
+                            style="width:100%;background:rgba(10,20,50,0.6);border:1px solid rgba(251,146,60,0.4);
+                            color:#e2e8f0;padding:7px 9px;border-radius:7px;font-size:12px;-webkit-appearance:none;">
+                            ${accOpts}
+                        </select>
+                    </div>
+                    <div>
+                        <div style="font-size:10px;color:#6ee7b7;margin-bottom:3px;">移動先口座</div>
+                        <select id="trToSelect"
+                            style="width:100%;background:rgba(10,20,50,0.6);border:1px solid rgba(52,211,153,0.4);
+                            color:#e2e8f0;padding:7px 9px;border-radius:7px;font-size:12px;-webkit-appearance:none;">
+                            ${accOpts}
+                        </select>
+                    </div>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:10px;color:#64748b;margin-bottom:3px;">メモ（任意）</div>
+                    <input id="trNoteInput" type="text" placeholder="ATM出金、銀行間振込など"
+                        style="width:100%;background:rgba(148,163,184,0.06);border:1px solid rgba(167,139,250,0.2);
+                        color:#e2e8f0;padding:7px 9px;border-radius:7px;font-size:12px;">
+                </div>
+                <button id="trSaveBtn"
+                    style="width:100%;background:linear-gradient(135deg,rgba(139,92,246,0.5),rgba(109,40,217,0.5));
+                    border:1px solid rgba(167,139,250,0.5);color:#e9d5ff;padding:10px;border-radius:8px;
+                    font-size:13px;font-weight:700;cursor:pointer;margin-bottom:14px;-webkit-tap-highlight-color:transparent;">
+                    🔄 記録する
+                </button>
+
+                <div id="trListLabel" style="font-size:11px;color:#64748b;margin-bottom:6px;">移動履歴（${transfers.length}件）</div>
+                <div class="transfer-list" id="transferListEl"></div>
+
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-cancel" id="trCloseBtn"
+                        style="background:rgba(100,116,155,0.15);color:#c4b5fd;
+                               border:1px solid rgba(167,139,250,0.25);border-radius:10px;padding:12px;font-weight:700;">
+                        閉じる
+                    </button>
+                </div>
+            </div>`;
+
+        renderTransferList(overlay);
+
+        overlay.querySelector('#trSaveBtn').addEventListener('click', () => {
+            const date = overlay.querySelector('#trDateInput').value.trim();
+            const amt  = parseInt(overlay.querySelector('#trAmtInput').value) || 0;
+            const from = overlay.querySelector('#trFromSelect').value;
+            const to   = overlay.querySelector('#trToSelect').value;
+            const note = overlay.querySelector('#trNoteInput').value.trim();
+            if (!date || amt <= 0) { showNotification('日付と金額を入力してください', 'info'); return; }
+            if (from === to) { showNotification('移動元と移動先が同じ口座です', 'info'); return; }
+            transfers.push({ id: transferId++, date, fromAccount: from, toAccount: to, amount: amt, note });
+            scheduleSave();
+            updateBalanceDOM();
+            overlay.querySelector('#trAmtInput').value = '';
+            overlay.querySelector('#trNoteInput').value = '';
+            overlay.querySelector('#trListLabel').textContent = `移動履歴（${transfers.length}件）`;
+            renderTransferList(overlay);
+            showNotification(`¥${amt.toLocaleString()} を ${from} → ${to} に記録しました 🔄`);
+        });
+
+        overlay.querySelector('#transferListEl').addEventListener('click', e => {
+            if (!e.target.classList.contains('tr-del')) return;
+            const tid = +e.target.dataset.tid;
+            if (!confirm('この資金移動を削除しますか？')) return;
+            transfers = transfers.filter(t => t.id !== tid);
+            scheduleSave();
+            updateBalanceDOM();
+            overlay.querySelector('#trListLabel').textContent = `移動履歴（${transfers.length}件）`;
+            renderTransferList(overlay);
+            showNotification('資金移動を削除しました');
+        });
+
+        overlay.querySelector('#trCloseBtn').addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
+
+    /* ─── レンダリング ─── */
+    function render() {
+        const monthItems = getMonthItems();
+        const s = calcSummary(monthItems);
+
+        if (monthItems.length === 0) {
+            // 全体に項目があるが、この月にはない場合とそうでない場合で文言を変える
+            const msg = items.length > 0
+                ? `${formatMonth(selectedMonth)}のデータはありません`
+                : 'CSVをアップロードするか、項目を追加してください';
+            itemsContainer.innerHTML = `<div class="empty-state"><div class="empty-icon">${items.length > 0 ? '📅' : '☁️'}</div><div>${msg}</div></div>`;
+            document.getElementById('itemCount').textContent = '';
+        } else {
+            document.getElementById('itemCount').textContent = `${monthItems.length}件`;
+
+            let displayItems = [...monthItems];
+            if (filterMode !== 'all') displayItems = displayItems.filter(i => i.type === filterMode);
+
+            // NEW: isNew の項目を常に先頭に固定してからソート
+            displayItems.sort((a, b) => {
+                if (a.isNew && !b.isNew) return -1;
+                if (!a.isNew && b.isNew) return  1;
+                // 同じグループ内は通常のソート
+                if (sortMode === 'date-desc')   return b.date.localeCompare(a.date);
+                if (sortMode === 'date-asc')    return a.date.localeCompare(b.date);
+                if (sortMode === 'amount-desc') return b.originalAmount - a.originalAmount;
+                if (sortMode === 'amount-asc')  return a.originalAmount - b.originalAmount;
+                if (sortMode === 'type')        return a.type.localeCompare(b.type);
+                return 0;
+            });
+
+            if (displayItems.length === 0) {
+                itemsContainer.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><div>該当する項目がありません</div></div>`;
+            } else {
+                itemsContainer.innerHTML = displayItems.map(item => {
+                    const burden      = calcBurden(item);
+                    const newBadge    = item.isNew ? '<span class="new-badge">NEW</span>' : '';
+                    const isCollected = item.type === 'fullAdvance' && item.collected;
+                    const cardClass   = [
+                        'item-card',
+                        item.imported ? 'imported' : 'custom',
+                        item.isNew ? 'new-item' : '',
+                        isCollected ? 'collected-card' : '',
+                        item.isSpecial ? 'special-item' : ''
+                    ].filter(Boolean).join(' ');
+
+                    const specialBadge = item.isSpecial ? '<span class="special-badge">🌟 集計除外</span>' : '';
+                    const nameBlock = item.imported
+                        ? `<div class="item-name">${escHtml(item.name)}${newBadge}${specialBadge}</div><div class="item-date">${item.date}</div>`
+                        : `<input class="name-input" type="text" name="name_${item.id}" value="${escAttr(item.name)}" placeholder="項目名を入力">`;
+
+                    return `
+<div class="${cardClass}" data-id="${item.id}">
+  <div class="item-header">
+    <div class="item-meta">${nameBlock}</div>
+    <button class="btn-delete">削除</button>
+  </div>
+
+  <div class="amount-row">
+    <label>総額</label>
+    <input class="amount-input" type="number" name="orig_${item.id}" value="${item.originalAmount}" placeholder="0" inputmode="numeric">
+    <span class="amount-unit">円</span>
+  </div>
+
+  ${buildCategorySelect(item)}
+  ${buildCardSelect(item)}
+  ${buildPaymentSourceSelect(item)}
+
+  <div class="type-selector">
+    <button class="type-btn ${item.type==='own'?'active-own':''}" data-type="own">自費負担</button>
+    <button class="type-btn ${item.type==='fullAdvance'?'active-full':''}" data-type="fullAdvance">全額立替</button>
+    <button class="type-btn ${item.type==='partialAdvance'?'active-partial':''}" data-type="partialAdvance">一部立替</button>
+  </div>
+
+  ${item.type === 'partialAdvance' ? `
+  <div class="partial-row">
+    <label>自費負担額</label>
+    <input class="amount-input" type="number" name="partial_${item.id}" value="${item.amount}" placeholder="0" inputmode="numeric">
+    <span class="amount-unit">円</span>
+  </div>` : ''}
+
+  ${item.type === 'fullAdvance' ? `
+  <div style="margin-bottom:8px;">
+    <button class="collect-toggle ${item.collected ? 'collected-done' : 'uncollected'}">
+      ${item.collected ? '✓ 回収済み' : '○ 未回収'}
+    </button>
+  </div>` : ''}
+
+  <div class="special-toggle-row">
+    <label class="special-toggle-label">
+      <input type="checkbox" class="special-toggle-cb" ${item.isSpecial ? 'checked' : ''}>
+      🌟 特別支出（生活費集計から除外）
+    </label>
+  </div>
+
+  <div class="item-footer">
+    <div class="burden-chip">
+      <span class="burden-chip-label">${item.isSpecial ? '除外（自己負担）' : '自分の負担'}</span>
+      ¥${burden.toLocaleString()}
+    </div>
+  </div>
+</div>`;
+                }).join('');
+            }
+        }
+
+        updateSummaryDOM(s, monthItems);
+    }
+
+    /* ─── ユーティリティ ─── */
+    function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function escAttr(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    }
+
+    /* ─── クラウド同期 ─── */
+
+    function setSyncIndicator(state, text) {
+        const el = document.getElementById('syncIndicator');
+        if (!el) return;
+        el.className = 'state-' + state;
+        el.innerHTML = state === 'syncing'
+            ? `<span class="sync-spin">🔄</span> ${text}`
+            : state === 'ok'
+            ? `✅ ${text}`
+            : state === 'error'
+            ? `⚠️ ${text}`
+            : '';
+        if (state === 'ok') {
+            clearTimeout(el._hideTimer);
+            el._hideTimer = setTimeout(() => { el.className = 'state-idle'; }, 3000);
+        }
+    }
+
+    function buildPayload() {
+        return {
+            items, itemId, budgets, incomes, cards, cardBudgets,
+            userCategories, accounts,
+            incomeRecords, incomeRecordId, transfers, transferId,
+            updatedAt,
+        };
+    }
+
+    function applyCloudPayload(data) {
+        if (!data || typeof data !== 'object') return false;
+        try {
+            if (Array.isArray(data.items) && data.items.length) items = data.items;
+            if (typeof data.itemId === 'number') itemId = data.itemId;
+            if (data.budgets)       budgets      = data.budgets;
+            if (data.incomes)       incomes      = data.incomes;
+            if (Array.isArray(data.cards) && data.cards.length) cards = data.cards;
+            if (data.cardBudgets)   cardBudgets  = data.cardBudgets;
+            if (Array.isArray(data.userCategories) && data.userCategories.length) userCategories = data.userCategories;
+            if (Array.isArray(data.accounts) && data.accounts.length) accounts = data.accounts;
+            if (Array.isArray(data.incomeRecords))  incomeRecords  = data.incomeRecords;
+            if (typeof data.incomeRecordId === 'number') incomeRecordId = data.incomeRecordId;
+            if (Array.isArray(data.transfers))  transfers  = data.transfers;
+            if (typeof data.transferId === 'number') transferId = data.transferId;
+            if (typeof data.updatedAt === 'number') updatedAt = data.updatedAt;
+            return true;
+        } catch(e) { return false; }
+    }
+
+    async function fetchFromCloud() {
+        if (!cloudSyncUrl) return null;
+        const res = await fetch(cloudSyncUrl, {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-store',
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+    }
+
+    async function pushToCloud() {
+        if (!cloudSyncUrl) return;
+        setSyncIndicator('syncing', '同期中...');
+        try {
+            const payload = buildPayload();
+            const res = await fetch(cloudSyncUrl, {
+                method: 'POST',
+                mode: 'cors',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            setSyncIndicator('ok', '同期済み');
+        } catch(e) {
+            console.error('[pushToCloud] 同期失敗:', e);
+            setSyncIndicator('error', 'オフライン');
+        }
+    }
+
+    async function syncWithCloud() {
+        if (!cloudSyncUrl) return;
+        setSyncIndicator('syncing', '同期中...');
+        try {
+            const cloudData = await fetchFromCloud();
+            if (!cloudData) { setSyncIndicator('error', '取得失敗'); return; }
+
+            const cloudTs = typeof cloudData.updatedAt === 'number' ? cloudData.updatedAt : 0;
+
+            if (cloudTs > updatedAt) {
+                // クラウドが新しい → ローカルに適用
+                if (applyCloudPayload(cloudData)) {
+                    // ローカルに保存（タイムスタンプ上書きしない）
+                    try {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(buildPayload()));
+                    } catch(e) {}
+                    scheduleRender();
+                    updateBalanceDOM();
+                    updateCategoryBudget(getMonthItems());
+                    setSyncIndicator('ok', '最新データを取得');
+                } else {
+                    setSyncIndicator('error', 'マージエラー');
+                }
+            } else if (updatedAt > cloudTs) {
+                // ローカルが新しい → クラウドへプッシュ
+                await pushToCloud();
+            } else {
+                // 同一 → 何もしない
+                setSyncIndicator('ok', '最新');
+            }
+        } catch(e) {
+            console.error('[syncWithCloud] 同期失敗:', e);
+            setSyncIndicator('error', 'オフライン');
+        }
+    }
+
+    function showCloudSyncModal() {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+
+        const currentUrl  = cloudSyncUrl;
+        const lastSyncStr = updatedAt
+            ? new Date(updatedAt).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })
+            : '未同期';
+
+        overlay.innerHTML = `
+<div class="modal-box cloud-modal-box" role="dialog" aria-modal="true">
+    <div class="modal-icon">☁️</div>
+    <div class="modal-title blue">クラウド同期設定</div>
+    <div class="modal-desc">Google Apps Script などの Web API URL を設定すると、<br>複数端末でデータを自動同期できます。</div>
+
+    <div class="${currentUrl ? 'cloud-status-row ok' : 'cloud-status-row idle'}" id="cloudStatusRow">
+        ${currentUrl ? `✅ 接続設定済み　最終同期: ${lastSyncStr}` : '⚪ URL未設定 — ローカルのみ動作'}
+    </div>
+
+    <div style="margin-bottom:10px;">
+        <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:5px;">同期 URL（GAS デプロイURL等）</label>
+        <textarea id="cloudUrlInput" class="cloud-url-input"
+            placeholder="https://script.google.com/macros/s/.../exec"
+            rows="3">${escHtml(currentUrl)}</textarea>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:10px 12px;font-size:11px;color:#64748b;line-height:1.7;margin-bottom:14px;">
+        <strong style="color:#93c5fd;">GAS API の仕様（参考）</strong><br>
+        ・<code style="color:#c4b5fd;">GET</code> → JSON全データを返す<br>
+        ・<code style="color:#c4b5fd;">POST</code> body=JSON → データ保存、<code style="color:#6ee7b7;">{ok:true}</code>を返す<br>
+        ・起動時・保存時・タブ復帰時に自動同期します
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <button class="modal-btn modal-btn-main blue-btn" id="cloudSaveBtn" style="flex:1;min-height:44px;">💾 URL を保存</button>
+        <button class="modal-btn modal-btn-sub" id="cloudTestBtn" style="flex:1;min-height:44px;">🔄 今すぐ同期</button>
+    </div>
+    <div style="display:flex;gap:8px;">
+        <button class="modal-btn modal-btn-cancel" id="cloudClearBtn" style="flex:1;color:#f87171;">🗑 URL を削除</button>
+        <button class="modal-btn modal-btn-cancel" id="cloudCloseBtn" style="flex:1;">閉じる</button>
+    </div>
+</div>`;
+
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('#cloudSaveBtn').addEventListener('click', () => {
+            const url = overlay.querySelector('#cloudUrlInput').value.trim();
+            cloudSyncUrl = url;
+            localStorage.setItem(CLOUD_URL_KEY, url);
+            overlay.remove();
+            showNotification(url ? '☁️ 同期URLを保存しました' : '同期URLを削除しました', 'info');
+            if (url) syncWithCloud();
+        });
+
+        overlay.querySelector('#cloudTestBtn').addEventListener('click', async () => {
+            const url = overlay.querySelector('#cloudUrlInput').value.trim();
+            if (!url) { showNotification('URLを入力してください', 'error'); return; }
+            // 一時的に適用してテスト
+            const prev = cloudSyncUrl;
+            cloudSyncUrl = url;
+            overlay.remove();
+            await syncWithCloud();
+            cloudSyncUrl = prev; // テスト後は元に戻す（保存はSaveボタン）
+        });
+
+        overlay.querySelector('#cloudClearBtn').addEventListener('click', () => {
+            cloudSyncUrl = '';
+            localStorage.removeItem(CLOUD_URL_KEY);
+            overlay.remove();
+            showNotification('同期URLを削除しました', 'info');
+        });
+
+        overlay.querySelector('#cloudCloseBtn').addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    }
+
+    function showNotification(msg, type = 'success') {
+        const el = document.createElement('div');
+        el.className = 'notification' + (type === 'error' ? ' error' : type === 'info' ? ' info' : '');
+        el.textContent = msg;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 2800);
+    }
+
+    /* ─── 初期化 ─── */
+    const wasRestored = loadFromStorage();
+    applyMonthDefaults(selectedMonth);
+    updateMonthDisplay();
+    scheduleRender();
+    updateBalanceDOM();
+
+    // クラウド同期ボタンのリスナー登録
+    document.getElementById('cloudSyncBtn')?.addEventListener('click', showCloudSyncModal);
+
+    // 起動時クラウド同期（ローカル復元後に最新データをフェッチ）
+    if (cloudSyncUrl) {
+        requestAnimationFrame(() => syncWithCloud());
+    }
+
+    // タブがアクティブになった瞬間に最新データをフェッチ（モバイル切り替え対策）
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && cloudSyncUrl) {
+            syncWithCloud();
+        }
+    });
+
+    // アコーディオン切り替えボタンの初期化
+    // 2カラムレイアウト（PC）ではsummary-colが独立スクロールするため常時展開。
+    // スマホ（≦768px）は縦積みで画面が圧迫されるため初期状態を折りたたむ。
+    requestAnimationFrame(() => {
+        const toggleBtn     = document.getElementById('summaryToggleBtn');
+        const collapsible   = document.getElementById('summaryCollapsible');
+        const summaryEl2    = document.getElementById('summarySection');
+        let summaryCollapsed = false;
+
+        if (toggleBtn && collapsible) {
+            // スマホでは初期折りたたみ
+            if (window.innerWidth <= 768) {
+                summaryCollapsed = true;
+                summaryEl2?.classList.add('collapsed');
+                collapsible.style.maxHeight = '0';
+                toggleBtn.textContent = '▼ 展開する';
+            } else {
+                collapsible.style.maxHeight = collapsible.scrollHeight + 'px';
+            }
+
+            toggleBtn.addEventListener('click', () => {
+                summaryCollapsed = !summaryCollapsed;
+                summaryEl2?.classList.toggle('collapsed', summaryCollapsed);
+                if (summaryCollapsed) {
+                    collapsible.style.maxHeight = '0';
+                    toggleBtn.textContent = '▼ 展開する';
+                } else {
+                    collapsible.style.maxHeight = collapsible.scrollHeight + 'px';
+                    toggleBtn.textContent = '▲ 折りたたむ';
+                }
+            });
+        }
+    });
+
+    // ミニバー (折りたたみ時の要約表示) を更新する関数
+    function updateMiniBar(s) {
+        const income  = getMonthIncome(selectedMonth);
+        const { total: totalAssets } = calcBalances();
+        const currentEst = income > 0 ? income - (s.finalBurden || 0) - (s.toCollect || 0) : null;
+        const fmtM = n => `¥${Math.abs(n).toLocaleString()}`;
+        document.getElementById('smb-total')   && (document.getElementById('smb-total').textContent   = `総支出 ${fmtM(s.totalAmount || 0)}`);
+        document.getElementById('smb-burden')  && (document.getElementById('smb-burden').textContent  = `自己負担 ${fmtM(s.finalBurden || 0)}`);
+        document.getElementById('smb-savings') && (document.getElementById('smb-savings').textContent = currentEst !== null ? `手元残り ${currentEst < 0 ? '−' : ''}${fmtM(currentEst)}` : `総資産 ${fmtM(totalAssets)}`);
+    }
+
+    if (wasRestored) {
+        requestAnimationFrame(() => {
+            const banner = document.createElement('div');
+            banner.style.cssText = [
+                'font-size:13px', 'color:#6ee7b7', 'background:rgba(16,185,129,0.12)',
+                'border:1px solid rgba(52,211,153,0.3)', 'border-radius:8px',
+                'padding:8px 14px', 'margin-bottom:12px',
+                'display:flex', 'justify-content:space-between', 'align-items:center'
+            ].join(';');
+            banner.innerHTML = `<span>💾 前回の入力内容を復元しました（全${items.length}件）</span><button onclick="this.parentElement.remove()" style="background:none;border:none;cursor:pointer;color:#64748b;font-size:16px;line-height:1;">✕</button>`;
+            document.querySelector('.items-section')?.insertAdjacentElement('beforebegin', banner);
+        });
+    }
+</script>
+</body>
+</html>
