@@ -10,17 +10,33 @@
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
+        html {
+            /* バウンス（オーバースクロール）時の白抜けをテーマ色で塗りつぶす */
+            background-color: #080f1e;
+            /* 横スクロール完全禁止 */
+            overflow-x: hidden;
+            /* 横向き時の文字サイズ自動拡大を抑止 */
+            -webkit-text-size-adjust: 100%;
+            text-size-adjust: 100%;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic UI', 'Segoe UI', sans-serif;
             background: linear-gradient(145deg, #080f1e 0%, #0f2040 40%, #112a5c 70%, #0d1f47 100%);
+            /* バウンス領域もグラデーション背景で統一 */
+            background-attachment: fixed;
             min-height: 100vh;
             min-height: 100dvh;
             padding: 16px;
             padding-bottom: max(16px, env(safe-area-inset-bottom));
             color: #e2e8f0;
+            /* 横スクロール完全禁止 */
+            overflow-x: hidden;
+            /* タップ時の青ハイライトをグローバルに無効化 */
+            -webkit-tap-highlight-color: transparent;
         }
 
-        .container { max-width: 1120px; margin: 0 auto; }
+        .container { max-width: 1120px; width: 100%; margin: 0 auto; overflow-x: hidden; }
 
         /* ── ヘッダー ── */
         .header { text-align: center; padding: 24px 0 28px; }
@@ -474,8 +490,32 @@
         /* レスポンシブ */
         @media (max-width: 540px) {
             body { padding: 12px; }
-            .controls { gap: 8px; }
-            .btn { flex: 1; min-width: 0; font-size: 13px; padding: 10px 10px; }
+
+            /* ── ツールバー: 2列グリッドに整理 ── */
+            .controls {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+            /* 「項目を追加」だけ全幅 */
+            .controls .btn-primary { grid-column: 1 / -1; }
+            .btn {
+                min-width: 0;
+                font-size: 12px;
+                padding: 10px 8px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            /* ── フィルタータブ: 2列ラップ ── */
+            .filter-tabs { flex-wrap: wrap; }
+            .filter-tab { flex: 1 1 calc(50% - 1px); font-size: 10px; }
+
+            /* ── ソートバー: フルWidthで折り返し ── */
+            .list-controls { flex-direction: column; align-items: stretch; }
+            .sort-select { width: 100%; }
+
             .summary-grid-top { grid-template-columns: repeat(3, 1fr); gap: 8px; }
             .summary-grid-top .summary-card { padding: 10px 8px; }
             .summary-grid-top .summary-card-value { font-size: clamp(13px, 3.5vw, 18px); }
@@ -488,6 +528,13 @@
         }
 
         /* ── 返金確認モーダル ── */
+        /* モーダル表示中はbodyスクロールを封じる */
+        body.modal-open {
+            overflow: hidden;
+            /* iOSでposition:fixedにしてもスクロール位置がずれないよう固定 */
+            touch-action: none;
+        }
+
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -499,7 +546,11 @@
             align-items: center;
             justify-content: center;
             padding: 16px;
+            padding-bottom: max(16px, env(safe-area-inset-bottom));
             animation: overlayIn 0.2s ease;
+            /* overlay自体はスクロール可能にしてタッチ伝播を止める */
+            overscroll-behavior: contain;
+            touch-action: pan-y;
         }
         @keyframes overlayIn {
             from { opacity: 0; }
@@ -4212,6 +4263,23 @@
         document.body.appendChild(el);
         setTimeout(() => el.remove(), 2800);
     }
+
+    /* ─── モーダル開閉時のbodyスクロール制御 ─────────────────────────
+       MutationObserverで .modal-overlay の追加/削除を監視し、
+       存在する間は body.modal-open を付与してiOSスクロールチェーンを封じる ── */
+    let _scrollY = 0;
+    new MutationObserver(() => {
+        const hasModal = !!document.querySelector('.modal-overlay');
+        if (hasModal && !document.body.classList.contains('modal-open')) {
+            _scrollY = window.scrollY;
+            document.body.classList.add('modal-open');
+            document.body.style.top = `-${_scrollY}px`;
+        } else if (!hasModal && document.body.classList.contains('modal-open')) {
+            document.body.classList.remove('modal-open');
+            document.body.style.top = '';
+            window.scrollTo({ top: _scrollY, behavior: 'instant' });
+        }
+    }).observe(document.body, { childList: true });
 
     /* ─── 初期化 ─── */
     const wasRestored = loadFromStorage();
